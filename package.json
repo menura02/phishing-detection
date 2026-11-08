@@ -1,0 +1,28 @@
+{
+  "name": "message-check",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "npm run build && npm run preview",
+    "preview": "vite preview --host 127.0.0.1 --strictPort",
+    "build": "vite build",
+    "lint": "oxlint --deny-warnings src tests playwright.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/analysis.test.ts",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "tldts": "7.4.19"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.19.2",
+    "oxlint": "1.92.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.6"
+  }
+}
