@@ -75,6 +75,7 @@ textarea[aria-invalid="true"] { border-color: var(--danger); }
 .risk-high .eyebrow { color: var(--danger); }
 .risk h3 { font-size: clamp(1.25rem, 2.4vw, 1.75rem); line-height: 1.2; margin-block: .3rem; }
 .risk .muted { margin-top: .4rem; }
+.recovery { margin-top: .8rem; }
 .research { margin-top: 1rem; padding: .85rem 1.15rem; overflow-wrap: anywhere; }
 .research > p, .research ul { margin-top: .45rem; }
 .research a, .intel-result a { color: var(--accent-dark); }

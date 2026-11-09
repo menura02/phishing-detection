@@ -1,6 +1,6 @@
 # Kimlik Avı Kontrolü
 
-Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.4.0`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
+Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.4.1`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
 
 ## Yerelde çalıştırma
 
@@ -36,6 +36,8 @@ Sonuç istatistiksel olasılık yerine uygulanan kuralların özetidir. “Belir
 Senaryo örnekleri için [FTC kimlik avı rehberi](https://consumer.ftc.gov/articles/how-recognize-avoid-phishing-scams) ve [FTC SMS rehberi](https://consumer.ftc.gov/articles/how-recognize-and-report-spam-text-messages).
 
 ## Gizlilik ve güvenlik
+
+Sonuç ekranındaki **Güvenli sonraki adımlar** bölümü bağımsız doğrulama yolunu ve bulgulara göre hesap, ödeme, cihaz veya QR kodu önlemlerini gösterir. **Mesajla zaten etkileşime geçtiysen** bölümü olası işlemlere göre müdahale adımlarını içerir. Her iki bölüm JSON ve yazdırma raporunda bulunur. [FTC phishing rehberi](https://consumer.ftc.gov/articles/how-recognize-avoid-phishing-scams) · [FTC müdahale rehberi](https://consumer.ftc.gov/articles/what-do-if-you-were-scammed) · [NCSC müdahale rehberi](https://www.ncsc.gov.uk/collection/phishing-scams/what-to-do)
 
 Mesaj, dosya ve analiz uygulama tarafından yalnızca açık sekmenin belleğinde tutulur. Analiz ağ isteği başlatmaz. Sayfa açılırken uygulamanın kendi sunucusundan genel tehdit veri dosyası yüklenir. Uygulama kullanıcı içeriğini günlüklere, kalıcı tarayıcı depolarına veya analitik sistemlerine yazmaz. Kullanıcı içeriği metin olarak gösterilir ve incelenen URL’ler tıklanabilir değildir. İçerik güvenlik politikası harici kaynak yüklemelerini ve form gönderimlerini engeller.
 

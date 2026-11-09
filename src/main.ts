@@ -1,5 +1,6 @@
 import './styles.css';
 import { analyze } from './analysis/analyze.ts';
+import { getGuidance } from './analysis/guidance.ts';
 import {
   INTEL_SOURCE, INTEL_SOURCE_URL, MAX_SNAPSHOT_BYTES, matchIntelligence, validateSnapshot, type IntelligenceResult, type Snapshot,
 } from './analysis/intelligence.ts';
@@ -231,6 +232,7 @@ function renderPrint() {
     section(copy.unavailable, list(report.unavailable.map((item) => item.explanation))),
     section(copy.limitations, list(report.limitations)),
     section(copy.next, list(report.nextSteps, true)),
+    section(copy.recovery, list(report.recoverySteps)),
   );
   if (report.originalText !== undefined) printReport.append(section(copy.original, element('pre', report.originalText)));
 }
@@ -256,6 +258,10 @@ function renderResult() {
   if (intelligence?.matches.length) resultBody.append(intelligenceSection(intelligence));
   resultBody.append(risk);
   if (intelligence && !intelligence.matches.length) resultBody.append(intelligenceSection(intelligence));
+  const guidance = getGuidance(analysis, language, intelligence);
+  const recovery = element('details', undefined, 'recovery');
+  recovery.append(element('summary', copy.recovery), list(guidance.recoverySteps));
+  resultBody.append(section(copy.next, list(guidance.nextSteps, true), recovery));
   const findings = element('ul', undefined, 'findings');
   for (const { signal, contextual, span } of analysis.findings) {
     const item = element('li');
@@ -296,7 +302,6 @@ function renderResult() {
   resultBody.append(
     section(copy.unavailable, list(analysis.unavailable.map((check) => copy.checks[check]))),
     section(copy.limitations, element('p', copy.limitText)),
-    section(copy.next, list(copy.steps, true)),
   );
 
   const checkbox = element('input');

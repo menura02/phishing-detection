@@ -1,10 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { analyze } from '../src/analysis/analyze.ts';
+import { messages } from '../src/i18n/index.ts';
 import { DAY_MS, digest, matchIntelligence, normalizeIndicator, validateSnapshot, type Snapshot } from '../src/analysis/intelligence.ts';
 import { characterCount, readTextFile, validateText } from '../src/analysis/input.ts';
 import { createReport, mergeSpans } from '../src/analysis/report.ts';
 import { MAX_CHARACTERS, MAX_FILE_BYTES } from '../src/config.ts';
+
+test('report suggests independent verification and guidance relevant to active evidence', () => {
+  const input = 'Send your password. Pay a processing fee. Scan the QR code. Install AnyDesk.';
+  const advice = messages.en.guidance;
+  const report = createReport(analyze(input), input, 'en');
+  assert.deepEqual(report.nextSteps, [advice.verify, advice.stop, advice.account, advice.payment, advice.device, advice.qr, advice.report]);
+  assert.deepEqual(report.recoverySteps, [advice.opened, advice.shared, advice.paid, advice.installed]);
+  const quote = 'Security training example: “Send your password.”';
+  assert.deepEqual(createReport(analyze(quote), quote, 'en').nextSteps, [advice.verify, advice.stop, advice.report]);
+  assert.ok(createReport(analyze(input), input, 'en', false, {
+    status: 'fresh', matches: [{ number: 1, kind: 'host' }],
+  }).nextSteps.includes(advice.reportedLink));
+});
 
 test('matches exact threat indicators without widening a host or URL path', async () => {
   const updatedAt = '2026-11-09T06:00:00.000Z';

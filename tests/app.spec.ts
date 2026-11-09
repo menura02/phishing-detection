@@ -30,6 +30,7 @@ test('renders research candidates and matches a reported link without sending th
   await page.getByRole('button', { name: 'Analiz et' }).click();
   await expect(page.locator('#result-body .intel-match')).toContainText('Phishing olarak bildirilmiş adres eşleşti');
   await expect(page.locator('#result-body .intel-match')).toContainText('Bağlantı 1 · tam ana makine adı');
+  await expect(page.locator('#result-body')).toContainText('Listede eşleşen bağlantıyı açmadan');
   await page.screenshot({ path: testInfo.outputPath('intel-mobile.png'), fullPage: true });
   await input.fill('https://sub.' + hostname + '/private');
   await page.getByRole('button', { name: 'Analiz et' }).click();
@@ -68,8 +69,12 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   await expect(page.locator('#result-body').getByText('Sender and reply domains differ')).toBeVisible();
   await expect(page.locator('.risk')).toContainText('alongside a deceptive link pattern');
   await expect(page.locator('.inspected-links')).toContainText('Destination hostname · bad.example');
-  await page.locator('#result-body summary').click();
+  await page.getByText('Evidence in the message', { exact: true }).click();
   await expect(page.locator('.evidence mark').filter({ hasText: 'Şifrenizi gönderin' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Safe next steps' })).toBeVisible();
+  await expect(page.locator('#result-body')).toContainText('Keep passwords and verification codes private.');
+  await page.locator('.recovery summary').click();
+  await expect(page.locator('.recovery')).toContainText('contact your bank or payment provider immediately');
   await expect(page.locator('.inspected-links a')).toHaveCount(0);
 
   const file = page.waitForEvent('download');
@@ -78,6 +83,7 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   expect(downloaded.suggestedFilename()).toBe('phishing-report.json');
   const raw = await readFile((await downloaded.path())!, 'utf8');
   expect(JSON.parse(raw)).toMatchObject({ assessment: { level: 'high', reason: { id: 'requestAndDeception' } }, language: 'en' });
+  expect(JSON.parse(raw).recoverySteps).toHaveLength(4);
   expect(raw).not.toContain('local-test');
   expect(raw).not.toContain('Şifrenizi gönderin');
   expect(raw).not.toContain('bad.example');
@@ -154,7 +160,7 @@ test('invalid files, XSS strings and URL-only messages produce safe states on mo
   await input.fill(payload);
   await expect(page.getByRole('button', { name: 'JSON indir' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Analiz et' }).click();
-  await page.locator('#result-body summary').click();
+  await page.getByText('Mesajdaki ilgili bölümler', { exact: true }).click();
   await expect(page.locator('.evidence')).toHaveText(payload);
   await expect(page.locator('img, a[href^="javascript:"], [onerror]')).toHaveCount(0);
   await page.getByRole('checkbox').check();
