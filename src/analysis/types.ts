@@ -23,6 +23,8 @@ export type Finding = {
 export type InspectedLink = {
   raw: string;
   span: Span;
+  labelSpan?: Span;
+  crossDomainMismatch?: boolean;
   signals: Signal[];
   hostname?: string;
   domain?: string;
@@ -40,4 +42,4 @@ export type Analysis = {
   unavailable: Unavailable[];
 };
 
-export const METHOD = { id: 'local-phishing-rules', version: '2.1.0' } as const;
+export const METHOD = { id: 'local-phishing-rules', version: '2.2.0' } as const;

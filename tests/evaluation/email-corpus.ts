@@ -9,10 +9,13 @@ import type { Risk } from '../../src/analysis/types.ts';
 const sampleSize = 80;
 const mailbox = '.evaluation/phishing-2025';
 const ham = '.evaluation/hard-ham.tar.bz2';
+const split = process.argv[2] ?? 'all';
+if (split !== 'all' && split !== 'development' && split !== 'holdout') throw new Error('Expected all, development or holdout.');
 
 function pick<T>(items: T[]): T[] {
-  if (items.length <= sampleSize) return items;
-  return Array.from({ length: sampleSize }, (_, index) => items[Math.floor((index + 0.5) * items.length / sampleSize)]);
+  const sampled = items.length <= sampleSize ? items :
+    Array.from({ length: sampleSize }, (_, index) => items[Math.floor((index + 0.5) * items.length / sampleSize)]);
+  return split === 'all' ? sampled : sampled.filter((_, index) => index % 2 === Number(split === 'holdout'));
 }
 
 function sha256(data: Buffer) {
@@ -33,6 +36,9 @@ async function compare(messages: Buffer[]) {
     plain: { high: 0, elevated: 0, uncertain: 0, none: 0 },
     eml: { high: 0, elevated: 0, uncertain: 0, none: 0 },
     raisedToHigh: 0, droppedFromHigh: 0, extraLinkTargets: 0, replyMismatch: 0,
+    reasons: {} as Record<string, number>,
+    activeSignals: {} as Record<string, number>,
+    labelMismatches: { sameDomain: 0, crossDomain: 0, sameDomainOnlyMessages: 0 },
   };
   for (const raw of messages) {
     try {
@@ -48,6 +54,13 @@ async function compare(messages: Buffer[]) {
       result.html += Number(extracted.evidence.bodyFormat === 'html');
       result.plain[plain.risk]++;
       result.eml[eml.risk]++;
+      result.reasons[eml.reason] = (result.reasons[eml.reason] ?? 0) + 1;
+      for (const signal of new Set(eml.findings.filter((finding) => !finding.contextual).map((finding) => finding.signal))) {
+        result.activeSignals[signal] = (result.activeSignals[signal] ?? 0) + 1;
+      }
+      const mismatches = eml.links.filter((link) => link.signals.includes('mismatch'));
+      for (const link of mismatches) result.labelMismatches[link.crossDomainMismatch ? 'crossDomain' : 'sameDomain']++;
+      if (mismatches.length && mismatches.every((link) => !link.crossDomainMismatch)) result.labelMismatches.sameDomainOnlyMessages++;
       result.raisedToHigh += Number(!hit(plain.risk) && hit(eml.risk));
       result.droppedFromHigh += Number(hit(plain.risk) && !hit(eml.risk));
       result.extraLinkTargets += Number(eml.links.length > plain.links.length);
@@ -69,6 +82,7 @@ const [phishing, legitimate] = await Promise.all([
   compare(pick(names).map((name) => execFileSync('tar', ['-xOf', ham, name], { maxBuffer: 8_000_000 }))),
 ]);
 console.log(JSON.stringify({
+  split,
   phishing: { source: 'Nazario phishing-2025', sha256: sha256(phishingBytes), ...phishing },
   legitimate: { source: 'SpamAssassin 20030228 hard_ham', sha256: sha256(legitimateBytes), ...legitimate },
 }, null, 2));

@@ -5,7 +5,7 @@ import { inspectLinks } from './links.ts';
 import { inspectText, isContextual } from './text.ts';
 import { METHOD, type Analysis, type Finding, type InspectedLink, type Signal, type Span } from './types.ts';
 
-const strongLinkSignals = new Set<Signal>(['mismatch', 'userinfo', 'subdomain', 'lookalike']);
+const strongLinkSignals = new Set<Signal>(['userinfo', 'subdomain', 'lookalike']);
 const sensitiveSignals = new Set<Signal>(['secrets', 'payment', 'approval', 'remoteAccess']);
 const actionSignals = new Set<Signal>(['login', 'attachment', 'callback', 'qr']);
 const linkActions = new Set<Signal>(['login', 'attachment']);
@@ -23,20 +23,19 @@ function assess(
   const pressure = active.has('urgency');
   const solicitation = [...active].some((signal) => sensitiveSignals.has(signal));
   const pretext = active.has('reward') || active.has('impersonation') || active.has('delivery') || active.has('invoice');
-  const deceptiveLink = [...active].some((signal) => strongLinkSignals.has(signal));
   const action = [...active].some((signal) => actionSignals.has(signal));
   const requestTargets = (signals: Set<Signal>) => linksForRequests(value,
     findings.filter((finding) => signals.has(finding.signal)), links, coverage);
-  const hasDeception = (link: InspectedLink) => link.signals.some((signal) => strongLinkSignals.has(signal));
-  if (solicitation && deceptiveLink && requestTargets(sensitiveSignals).some(hasDeception)) {
+  const hasDeception = (link: InspectedLink) => link.crossDomainMismatch || link.signals.some((signal) => strongLinkSignals.has(signal));
+  if (solicitation && requestTargets(sensitiveSignals).some(hasDeception)) {
     return { risk: 'high', reason: 'requestAndDeception' };
   }
   if (solicitation && pressure && pretext) return { risk: 'high', reason: 'requestAndPressure' };
-  if (action && deceptiveLink && requestTargets(linkActions).some(hasDeception)) {
+  if (action && requestTargets(linkActions).some(hasDeception)) {
     return { risk: 'high', reason: 'actionAndDeception' };
   }
   if (solicitation) return { risk: 'elevated', reason: 'sensitiveRequest' };
-  if (deceptiveLink) return { risk: 'elevated', reason: 'destinationDeception' };
+  if (links.some(hasDeception)) return { risk: 'elevated', reason: 'destinationDeception' };
   if (pressure && pretext) return { risk: 'elevated', reason: 'pressureAndPretext' };
   const relatedConcern = action && requestTargets(linkActions).some((link) => link.signals.some((signal) => linkConcerns.has(signal)));
   if (action && (pretext || relatedConcern || replyMismatch)) return { risk: 'elevated', reason: 'actionAndPretext' };
@@ -61,11 +60,19 @@ export function analyze(value: string, timestamp = new Date().toISOString()): An
   const body = mask(value, headers.spans);
   const { links, coverage } = inspectLinks(body);
   const prose = mask(body, coverage);
-  const hasText = /\p{Script=Latin}/u.test(prose);
-  const findings = hasText ? inspectText(prose).map((finding) => ({
-    ...finding,
-    contextual: isContextual(value, finding.span),
-  })) : [];
+  const textFindings = inspectText(prose);
+  for (const { labelSpan } of links) {
+    if (!labelSpan) continue;
+    for (const finding of inspectText(value.slice(labelSpan.start, labelSpan.end))) {
+      textFindings.push({
+        ...finding, span: { start: labelSpan.start + finding.span.start, end: labelSpan.start + finding.span.end },
+      });
+    }
+  }
+  const hasText = /\p{Script=Latin}/u.test(prose) || textFindings.length > 0;
+  const findings = textFindings.map((finding) => ({
+    ...finding, contextual: isContextual(value, finding.span),
+  }));
   if (headers.finding) findings.push(headers.finding);
   for (const link of links) {
     for (const signal of link.signals) {
@@ -86,7 +93,8 @@ export function analyze(value: string, timestamp = new Date().toISOString()): An
     const scopedLinks = links.slice(start, linkIndex);
     const scopedCoverage = coverage.slice(start, linkIndex);
     const contextualStarts = new Set(section.findings.filter((finding) => finding.contextual).map((finding) => finding.span.start));
-    const candidates = scopedLinks.map((link) => contextualStarts.has(link.span.start) ? { ...link, signals: [] } : link);
+    const candidates = scopedLinks.map((link) => contextualStarts.has(link.span.start)
+      ? { ...link, signals: [], crossDomainMismatch: false } : link);
     const result = assess(value, active, candidates, scopedCoverage, Boolean(headers.finding && !headers.finding.contextual));
     if (riskRank[result.risk] > riskRank[assessment.risk]) assessment = result;
   }

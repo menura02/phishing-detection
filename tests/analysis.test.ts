@@ -164,6 +164,31 @@ test('links only the nearest explicit target to a request in the same section', 
   }
 });
 
+test('separates same-domain and explained redirect mismatches from unrelated destinations', () => {
+  const standalone = analyze('[https://example.org](https://tracking.example/redirect)');
+  assert.equal(standalone.risk, 'elevated');
+  assert.ok(standalone.findings.some((finding) => finding.signal === 'mismatch'));
+  const sameSite = analyze('Verify your account: [https://example.org/start](https://login.example.org/check)');
+  assert.equal(sameSite.risk, 'uncertain');
+  assert.ok(sameSite.findings.some((finding) => finding.signal === 'mismatch'));
+  assert.equal(analyze('Verify your account: [example.org](https://different.example/login)').risk, 'high');
+  assert.equal(analyze('https://example.org@different.example/').risk, 'elevated');
+  const wrapper = analyze('[https://example.org/start](https://tracking.example/redirect?url=https%3A%2F%2Fexample.org%2Fstart)');
+  assert.equal(wrapper.risk, 'uncertain');
+  assert.deepEqual(wrapper.links[0].signals, ['mismatch', 'redirect']);
+  assert.equal(analyze('[https://example.org/start](https://tracking.example/redirect?url=https%3A%2F%2Fexample.org%2Fother)').risk, 'elevated');
+});
+
+test('reads a link label as an action and only associates it with its own target', () => {
+  const label = 'Belgeyi görüntülemek için oturum açın';
+  const value = '🙂 [' + label + '](https://example.org@different.example/)';
+  const result = analyze(value);
+  const login = result.findings.find((finding) => finding.signal === 'login')!;
+  assert.equal(value.slice(login.span.start, login.span.end), label);
+  assert.equal(result.reason, 'actionAndDeception');
+  assert.equal(analyze('[Sign in to view the file](https://example.org) https://example.org@different.example/').risk, 'elevated');
+});
+
 test('keeps quoted and signature evidence visible and evaluates forwarded requests separately', () => {
   for (const divider of ['-- \n', 'Saygılarımla,\n', '> ']) {
     const result = analyze('Hesabınızı doğrulayın.\n' + divider + '[example.org](https://bad.example/check)');
@@ -240,7 +265,7 @@ test('report carries method, time and limitations without leaking content by def
   assert.equal(report.timestamp, '2026-10-01T08:00:00.000Z');
   assert.equal(report.analysisType, 'phishing');
   assert.equal(report.schemaVersion, 2);
-  assert.equal(report.method.version, '2.1.0');
+  assert.equal(report.method.version, '2.2.0');
   assert.equal(report.assessment.level, 'elevated');
   assert.equal(report.assessment.reason.id, 'sensitiveRequest');
   assert.deepEqual(report.unavailable.map(({ id }) => id), ['senderHeaders', 'linkAccess', 'senderAuthentication']);

@@ -31,7 +31,7 @@ function cleanTrailing(raw: string): string {
   return value;
 }
 
-function inspectTarget(raw: string, label?: string): Pick<InspectedLink, 'signals' | 'hostname' | 'domain'> {
+function inspectTarget(raw: string, label?: string): Pick<InspectedLink, 'signals' | 'hostname' | 'domain' | 'crossDomainMismatch'> {
   const restored = restoreAddress(raw);
   const url = urlFrom(restored);
   if (!url) return { signals: ['unparsed'] };
@@ -40,6 +40,7 @@ function inspectTarget(raw: string, label?: string): Pick<InspectedLink, 'signal
   const parts = parse(host, { allowPrivateDomains: true });
   const shown = label && urlFrom(restoreAddress(label));
   const signals: Signal[] = [];
+  let crossDomainMismatch = false;
   if (shown) {
     const shownHost = shown.hostname.replace(/\.$/u, '');
     const explicitScheme = /^https?:\/\//iu.test(label);
@@ -48,6 +49,8 @@ function inspectTarget(raw: string, label?: string): Pick<InspectedLink, 'signal
       (explicitScheme && shown.protocol !== url.protocol) ||
       (explicitPath && shown.pathname + shown.search + shown.hash !== url.pathname + url.search + url.hash)) {
       signals.push('mismatch');
+      const shownDomain = parse(shownHost, { allowPrivateDomains: true }).domain ?? shownHost;
+      crossDomainMismatch = shownDomain !== (parts.domain ?? host);
     }
   }
   if (parts.isIp) signals.push('ip');
@@ -64,6 +67,7 @@ function inspectTarget(raw: string, label?: string): Pick<InspectedLink, 'signal
     return !host.endsWith('.' + domain) && host !== domain &&
       (name.split('-').includes(brand) || name.replaceAll('0', 'o').replaceAll('1', 'l') === brand);
   })) signals.push('lookalike');
+  const redirectTargets = new Set<string>();
   for (const [key, value] of url.searchParams) {
     if (!redirectKeys.has(key.toLowerCase()) || !/^(?:https?:)?\/\//iu.test(value)) continue;
     const target = urlFrom(value);
@@ -71,14 +75,16 @@ function inspectTarget(raw: string, label?: string): Pick<InspectedLink, 'signal
     const targetHost = target.hostname.replace(/\.$/u, '');
     const targetDomain = parse(targetHost, { allowPrivateDomains: true }).domain ?? targetHost;
     if (targetDomain !== (parts.domain ?? host)) {
-      signals.push('redirect');
-      break;
+      redirectTargets.add(target.href);
     }
   }
+  if (redirectTargets.size) signals.push('redirect');
+  // An explicitly embedded matching address can explain the mismatch without proving the redirect behavior.
+  if (shown && redirectTargets.size === 1 && redirectTargets.has(shown.href)) crossDomainMismatch = false;
   const path = url.pathname.replace(/%[0-9a-f]{2}/giu, (code) => String.fromCharCode(Number.parseInt(code.slice(1), 16)));
   if (riskyExtensions.test(path)) signals.push('download');
   if (restored !== raw) signals.push('defanged');
-  return { signals, hostname: host, domain: parts.domain ?? undefined };
+  return { signals, hostname: host, domain: parts.domain ?? undefined, ...(crossDomainMismatch ? { crossDomainMismatch } : {}) };
 }
 
 function overlaps(a: Span, b: Span): boolean {
@@ -93,8 +99,10 @@ export function inspectLinks(value: string): { links: InspectedLink[]; coverage:
     if (coverage.some((span) => overlaps(span, outer))) return;
     const span = { start: base + range[0], end: base + range[1] };
     const raw = value.slice(span.start, span.end);
+    const [labelStart, labelEnd] = match.indices!.groups!.label;
+    const labelSpan = urlFrom(label) ? undefined : { start: labelStart, end: labelEnd };
     coverage.push(outer);
-    links.push({ raw, span, ...inspectTarget(raw, label) });
+    links.push({ raw, span, labelSpan, ...inspectTarget(raw, label) });
   }
 
   const anchors = /<a(?=\s|>)(?<attrs>(?:[^<>"'\n]|"[^"\n]*"|'[^'\n]*')*)>(?<label>[^<\n]*)<\/a\s*>/dgiu;

@@ -141,7 +141,7 @@ export const tr: typeof en = {
     callback: ['Arama veya iptal talebi', 'Mesaj, sözde işlemi iptal etmek veya sorgulamak için kendi iletişim kanalını kullanmanı istiyor.'],
     qr: ['QR kodu okutma talebi', 'QR kodu hedef adresi gizleyebilir. Bu kontrol yalnızca mesajdaki ifadeyi inceler.'],
     replyMismatch: ['Gönderici ve yanıt alan adları farklı', 'Yapıştırılan başlıklarda yanıt adresi farklı bir kaydedilebilir alan adına ait. Meşru hizmetler de farklı yanıt alan adları kullanabilir.'],
-    mismatch: ['Görünen adres hedefle uyuşmuyor', 'Bağlantı etiketinde açıkça gösterilen adresin bir bölümü hedeften farklı.'],
+    mismatch: ['Görünen adres hedefle uyuşmuyor', 'Bağlantı etiketi ile hedef farklı. Bu fark meşru yönlendirmelerde de görülebilir. Risk seviyesini belirlemek için diğer bulgularla birlikte değerlendirilir.'],
     ip: ['Ana makine adı olarak IP adresi', 'Bağlantı sayısal bir adres kullanıyor. Bu, adresin kime ait olduğunu anlamayı zorlaştırır.'],
     punycode: ['Uluslararası alan adı', 'Ana makine adı Punycode kullanıyor. Bu gösterim meşru adlar ve benzer görünümlü karakterler için kullanılabilir.'],
     userinfo: ['Ana makine adından önce kullanıcı bilgisi', '@ işaretinin önündeki bölüm hedef gibi görünebilir. Gerçek ana makine adı işaretten sonra gelir.'],

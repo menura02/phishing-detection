@@ -1,6 +1,6 @@
 # Kimlik Avı Kontrolü
 
-Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.5.0`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
+Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.6.0`, analiz yöntemi `local-phishing-rules 2.2.0`, JSON şeması `2`.
 
 ## Yerelde çalıştırma
 
@@ -26,6 +26,8 @@ npm run dev
 Yerel ifade kuralları zaman baskısı, hassas veri veya ödeme talebi, ödül, kimlik iddiası, teslimat sorunu ve fatura uyarısı arar. Hesap doğrulama, oturum onayı, uzaktan erişim, ek dosya açma, geri arama ve QR okutma talepleri ayrı bulgular olarak gösterilir. Açık uyarı ve alıntı bağlamları bulguların ağırlığını düşürür. Tekrarlanan göstergeler yeni risk kategorileri oluşturmaz. Risk açıklaması, değerlendirmeyi belirleyen birleşimi gösterir. Örneğin bir işlem talebinin yanıltıcı bağlantıyla birlikte görülmesi yüksek risk üretebilir.
 
 Motor, bir talebi aynı metin bölümünde hemen ardından gelen ilk bağlantıyla eşleştirir. Arada başka bir açıklama veya bağlantı varsa bulgular ayrı kalır. Boş satırları ve yaygın iletme ayraçlarını bölüm sınırı sayar. Tanınan imza bölümleri ve `>` ile başlayan alıntılar bulgularda görünür ve risk birleşimine katılmaz. Bu yaklaşım bağlantısı başka paragrafta olan veya belirgin talep içermeyen saldırıları kaçırabilir.
+
+Bağlantı etiketindeki bir işlem talebi de kendi hedefine bağlanır. Örneğin “Belgeyi görüntülemek için oturum açın” ifadesi, etiketin ait olduğu bağlantıyla birlikte değerlendirilir. Görünen adres ve hedef aynı kaydedilebilir alan adındaysa, fark tek başına riski yükseltmez. Yönlendirme parametresi etiketin gösterdiği adresi aynen içeriyorsa uyuşmazlık görünür kalır, ancak başka bir açıklama olabileceği hesaba katılır. Yönlendirme çalıştırılmaz ve gerçek hedef doğrulanmaz.
 
 Bağlantı hedefleri WHATWG `URL` ayrıştırıcısıyla incelenir. Paketle gelen Public Suffix List verisi, kaydedilebilir alan adını alt alan adından ayırır. Yapısal kontroller kullanıcı bilgisi, IP, Punycode, kısaltıcı, benzer alan adı, başka bir alan adına işaret eden URL parametresi ve çalıştırılabilir dosya uzantılarını kapsar. Düz metin, `hxxps` veya `[.]` gösterimi, basit Markdown ve metin etiketli HTML bağlantıları desteklenir. Zengin biçimden düz metne yapıştırırken gizli hedef kaybolabilir.
 
@@ -90,7 +92,7 @@ npm run evaluate -- holdout
 
 Bu ölçüm, seçilen senaryolardaki davranışı gösterir. Üretim doğruluğunu ölçmek için kimliksizleştirilmiş ve bağımsız doğrulanmış gerçek mesajlar gerekir.
 
-### Gerçek e-posta başlangıç ölçümü
+### Gerçek e-posta başlangıç ölçümü (v0.5.0)
 
 Nazario 2025 arşivinden phishing, Apache SpamAssassin `20030228_hard_ham` arşivinden meşru sınıfı için eşit aralıklı 80'er örnek seçildi. Aynı motor, önce HTML'deki görünen metin ve konu ile, sonra özgün dosyadan çıkarılan konu, gövde, başlıklar ve bağlantı hedefleri ile çalıştırıldı. Adres itibarı değerlendirmeye dahil edilmedi. Meşru sınıfta 3 dosya analiz giriş sınırlarına uymadığı için iki taraftan da çıkarıldı. Kaynak etiketleri arşivlere aittir. Setler farklı dönemlerden geldiği ve gerçek Türkçe e-postalar için doğrulanabilir ayrı bir sınıf bulunamadığı için bu sonuç güncel Türkçe trafiğe genellenemez.
 
@@ -103,6 +105,17 @@ Nazario 2025 arşivinden phishing, Apache SpamAssassin `20030228_hard_ham` arşi
 Özgün dosya 67 phishing ve 52 meşru mesajda ek bağlantı hedefi sağladı. Ek kanıt hem bulunan saldırıları hem de meşru mesajlara verilen uyarıları artırdı.
 
 Tekrar çalıştırmak için [Nazario phishing-2025](https://monkey.org/~jose/phishing/phishing-2025) dosyasını `.evaluation/phishing-2025` yoluna, [Apache hard_ham](https://spamassassin.apache.org/old/publiccorpus/20030228_hard_ham.tar.bz2) dosyasını `.evaluation/hard-ham.tar.bz2` yoluna kaydet. `tar` komutu kurulu iken `npm run evaluate:email` çalıştır. Komut arşiv özetlerini ve yalnızca toplu ölçümleri yazar. Kaynak mesajlar Git’e girmez. Nazario arşivi José Nazario tarafından CC BY 4.0 koşuluyla yayımlanmıştır. SpamAssassin arşivindeki mesaj hakları özgün gönderenlere aittir. [Nazario arşiv notları](https://monkey.org/~jose/phishing/README.txt) · [SpamAssassin arşiv notları](https://spamassassin.apache.org/old/publiccorpus/readme.html)
+
+### Bağlantı kurallarının karşılaştırması (v0.6.0)
+
+Aynı örneklem sırasındaki çift konumlar geliştirme, tek konumlar ayrı karşılaştırma grubu olarak ayrıldı (sıfır tabanlı). `npm run evaluate:email -- development` ve `npm run evaluate:email -- holdout` komutları her grubun sonuçlarını verir. Aşağıdaki tablo özgün e-postadaki artmış veya yüksek risk eşiğini gösterir.
+
+| Ayrı karşılaştırma grubu | v0.5.0 | v0.6.0 |
+| --- | ---: | ---: |
+| Uyarı alan phishing | 4/40 | 4/40 |
+| Uyarı alan meşru mesaj | 6/40 | 4/40 |
+
+İlk denemede bütün tekil adres uyuşmazlıklarının ağırlığı azaltıldığında phishing uyarıları da kayboldu. Son kural yalnızca aynı alan adı ve açıklanabilir hedef parametresi durumlarını daha temkinli değerlendirir. Ayrı grup aynı arşiv örnekleminden geldiği için bağımsız saha testi sayılmaz. Bu grupta 36 phishing mesajı artmış risk eşiğinin altında kaldı.
 
 - `src/analysis/` girdiyi, kuralları, sonuç tiplerini ve rapor şemasını içerir.
 - `src/i18n/` arayüz ve rapor çevirilerini, `src/config.ts` geçici ürün adını ve sınırları tutar.

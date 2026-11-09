@@ -139,7 +139,7 @@ export const en = {
     callback: ['Callback or cancellation request', 'The message asks you to use its contact channel to dispute or cancel an alleged transaction.'],
     qr: ['QR scanning request', 'A QR code can conceal its destination until scanned. This check only examines the wording.'],
     replyMismatch: ['Sender and reply domains differ', 'The pasted headers point replies to a different registrable domain. Legitimate services can also use separate reply domains.'],
-    mismatch: ['Displayed address differs from the destination', 'The address shown in the link label differs from the target in a part the label explicitly shows.'],
+    mismatch: ['Displayed address differs from the destination', 'The label and target differ. Legitimate redirects can also create this difference. The risk level considers it alongside other evidence.'],
     ip: ['IP address used as a host', 'The link uses a numeric address, which makes ownership harder to recognize.'],
     punycode: ['Internationalized hostname', 'The hostname uses Punycode. It can represent legitimate names as well as visually similar characters.'],
     userinfo: ['User information before the hostname', 'Text before the @ can look like a destination while the real hostname comes after it.'],

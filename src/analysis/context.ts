@@ -48,10 +48,15 @@ export function linksForRequests(value: string, requests: Finding[], links: Insp
   let index = 0;
   for (const request of requests.sort((a, b) => a.span.end - b.span.end)) {
     // Coverage starts at the whole link expression, including a Markdown or HTML label.
-    while (coverage[index] && coverage[index].start < request.span.end) index++;
+    while (coverage[index] && coverage[index].end < request.span.end) index++;
     const link = links[index];
     if (!link) break;
     const start = coverage[index].start;
+    if (link.labelSpan && request.span.start >= link.labelSpan.start && request.span.end <= link.labelSpan.end) {
+      linked.add(link);
+      continue;
+    }
+    if (start < request.span.end) continue;
     const gap = start - request.span.end;
     if (gap <= 90 && connector.test(value.slice(request.span.end, start))) linked.add(link);
   }
