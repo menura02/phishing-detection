@@ -1,0 +1,10 @@
+[
+  {"id":"tr-bank","language":"tr","label":"phishing","text":"Bankanızdan yazıyoruz. Hesabınız kapatılacak. Şifrenizi gönderin."},
+  {"id":"en-prize","language":"en","label":"phishing","text":"You have won a prize. Respond immediately. Pay a processing fee to claim it."},
+  {"id":"tr-delivery","language":"tr","label":"phishing","text":"Kargonuz teslim edilemedi. Teslimat adresinizi güncelleyin:\n[example.org](https://delivery-check.example/update)"},
+  {"id":"en-callback","language":"en","label":"phishing","text":"Unauthorized charge. If you did not authorize this purchase, call support."},
+  {"id":"tr-signature","language":"tr","label":"legitimate","text":"Hesabınızı doğrulayın: https://accounts.example.org/verify\n\nSaygılarımızla,\nDestek ekibi\n[example.org](https://email-service.example/signature)"},
+  {"id":"en-quoted","language":"en","label":"legitimate","text":"Verify your account at https://accounts.example.org.\n\n> Prior incident: [example.org](https://malicious.example)"},
+  {"id":"tr-training","language":"tr","label":"legitimate","text":"Bu bir eğitim örneği:\n“Şifrenizi gönderin: https://example.org@training.example.”"},
+  {"id":"en-invoice","language":"en","label":"legitimate","text":"Your invoice is attached for your records. No payment is due."}
+]

@@ -40,4 +40,4 @@ export type Analysis = {
   unavailable: Unavailable[];
 };
 
-export const METHOD = { id: 'local-phishing-rules', version: '2.0.0' } as const;
+export const METHOD = { id: 'local-phishing-rules', version: '2.1.0' } as const;

@@ -1,6 +1,6 @@
 # Kimlik Avı Kontrolü
 
-Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.2.0`, analiz yöntemi `local-phishing-rules 2.0.0`, JSON şeması `2`. Yeni JSON şeması risk gerekçesini ve gönderici kontrollerinin kapsamını içerir.
+Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.3.0`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
 
 ## Yerelde çalıştırma
 
@@ -24,6 +24,8 @@ npm run dev
 ## Analiz yaklaşımı ve sınırlar
 
 Yerel ifade kuralları zaman baskısı, hassas veri veya ödeme talebi, ödül, kimlik iddiası, teslimat sorunu ve fatura uyarısı arar. Hesap doğrulama, oturum onayı, uzaktan erişim, ek dosya açma, geri arama ve QR okutma talepleri ayrı bulgular olarak gösterilir. Açık uyarı ve alıntı bağlamları bulguların ağırlığını düşürür. Tekrarlanan göstergeler yeni risk kategorileri oluşturmaz. Risk açıklaması, değerlendirmeyi belirleyen birleşimi gösterir. Örneğin bir işlem talebinin yanıltıcı bağlantıyla birlikte görülmesi yüksek risk üretebilir.
+
+Motor, bir talebi aynı metin bölümünde hemen ardından gelen ilk bağlantıyla eşleştirir. Arada başka bir açıklama veya bağlantı varsa bulgular ayrı kalır. Boş satırları ve yaygın iletme ayraçlarını bölüm sınırı sayar. Tanınan imza bölümleri ve `>` ile başlayan alıntılar bulgularda görünür ve risk birleşimine katılmaz. Bu yaklaşım bağlantısı başka paragrafta olan veya belirgin talep içermeyen saldırıları kaçırabilir.
 
 Bağlantı hedefleri WHATWG `URL` ayrıştırıcısıyla incelenir. Paketle gelen Public Suffix List verisi, kaydedilebilir alan adını alt alan adından ayırır. Yapısal kontroller kullanıcı bilgisi, IP, Punycode, kısaltıcı, benzer alan adı, başka bir alan adına işaret eden URL parametresi ve çalıştırılabilir dosya uzantılarını kapsar. Düz metin, `hxxps` veya `[.]` gösterimi, basit Markdown ve metin etiketli HTML bağlantıları desteklenir. Zengin biçimden düz metne yapıştırırken gizli hedef kaybolabilir.
 
@@ -51,6 +53,24 @@ npm run test:browser
 ```
 
 Tarayıcı testleri statik üretim çıktısını kullanır ve önizleme sunucusunu kendisi başlatır. Kurulu Google Chrome’u kullanmak için `PLAYWRIGHT_CHANNEL=chrome` ayarlanabilir. PowerShell örneği `$env:PLAYWRIGHT_CHANNEL = 'chrome'; npm run test:browser`. Testler seçilmiş senaryolardaki kural ve arayüz davranışını doğrular. Gerçek dünya tespit doğruluğu için bir ölçüm sunmaz.
+
+### Karşılaştırmalı değerlendirme
+
+```sh
+npm run evaluate -- development
+npm run evaluate -- holdout
+```
+
+`tests/evaluation/` altında 8 geliştirme ve 12 ayrı değerlendirme senaryosu vardır. Örnekler Türkçe ve İngilizceye eşit dağılır. Bunlar kimlik bilgisi içermeyen sentetik mesajlardır ve etiketler senaryonun varsayılan bağlamını gösterir. Çıktı, her dil için yalnızca yüksek risk ve artmış veya yüksek risk eşiklerinde yakalanan saldırıları, kaçırılan saldırıları ve yanlış alarmları ayrı sayar.
+
+| Ayrı değerlendirme seti | v0.2.0 | v0.3.0 |
+| --- | ---: | ---: |
+| Yüksek risk alan meşru senaryo | 4/6 | 0/6 |
+| Artmış veya yüksek risk alan meşru senaryo | 4/6 | 3/6 |
+| Yüksek risk alan phishing senaryosu | 4/6 | 4/6 |
+| Artmış veya yüksek risk alan phishing senaryosu | 4/6 | 4/6 |
+
+Bu ölçüm, seçilen senaryolardaki davranışı gösterir. Üretim doğruluğunu ölçmek için kimliksizleştirilmiş ve bağımsız doğrulanmış gerçek mesajlar gerekir.
 
 - `src/analysis/` girdiyi, kuralları, sonuç tiplerini ve rapor şemasını içerir.
 - `src/i18n/` arayüz ve rapor çevirilerini, `src/config.ts` geçici ürün adını ve sınırları tutar.

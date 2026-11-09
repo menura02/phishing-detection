@@ -1,30 +1,46 @@
 import { validateText } from './input.ts';
+import { groupFindings, linksForRequests } from './context.ts';
 import { inspectHeaders } from './headers.ts';
 import { inspectLinks } from './links.ts';
 import { inspectText, isContextual } from './text.ts';
-import { METHOD, type Analysis, type Finding, type Signal, type Span } from './types.ts';
+import { METHOD, type Analysis, type Finding, type InspectedLink, type Signal, type Span } from './types.ts';
 
 const strongLinkSignals = new Set<Signal>(['mismatch', 'userinfo', 'subdomain', 'lookalike']);
 const sensitiveSignals = new Set<Signal>(['secrets', 'payment', 'approval', 'remoteAccess']);
+const actionSignals = new Set<Signal>(['login', 'attachment', 'callback', 'qr']);
+const linkActions = new Set<Signal>(['login', 'attachment']);
+const linkConcerns = new Set<Signal>(['redirect', 'download', 'shortener', 'ip', 'punycode']);
+const riskRank = { none: 0, uncertain: 1, elevated: 2, high: 3 };
 
-function assess(findings: Finding[], hasText: boolean): Pick<Analysis, 'risk' | 'reason'> {
-  const active = new Set(findings.filter((finding) => !finding.contextual).map((finding) => finding.signal));
+function assess(
+  value: string,
+  findings: Finding[],
+  links: InspectedLink[],
+  coverage: Span[],
+  replyMismatch: boolean,
+): Pick<Analysis, 'risk' | 'reason'> {
+  const active = new Set(findings.map((finding) => finding.signal));
   const pressure = active.has('urgency');
   const solicitation = [...active].some((signal) => sensitiveSignals.has(signal));
   const pretext = active.has('reward') || active.has('impersonation') || active.has('delivery') || active.has('invoice');
   const deceptiveLink = [...active].some((signal) => strongLinkSignals.has(signal));
-  const action = active.has('login') || active.has('attachment') || active.has('callback') || active.has('qr');
-  const destinationConcern = active.has('redirect') || active.has('download') || active.has('shortener') ||
-    active.has('ip') || active.has('punycode') || active.has('replyMismatch');
-  if (solicitation && deceptiveLink) return { risk: 'high', reason: 'requestAndDeception' };
+  const action = [...active].some((signal) => actionSignals.has(signal));
+  const requestTargets = (signals: Set<Signal>) => linksForRequests(value,
+    findings.filter((finding) => signals.has(finding.signal)), links, coverage);
+  const hasDeception = (link: InspectedLink) => link.signals.some((signal) => strongLinkSignals.has(signal));
+  if (solicitation && deceptiveLink && requestTargets(sensitiveSignals).some(hasDeception)) {
+    return { risk: 'high', reason: 'requestAndDeception' };
+  }
   if (solicitation && pressure && pretext) return { risk: 'high', reason: 'requestAndPressure' };
-  if (action && deceptiveLink) return { risk: 'high', reason: 'actionAndDeception' };
+  if (action && deceptiveLink && requestTargets(linkActions).some(hasDeception)) {
+    return { risk: 'high', reason: 'actionAndDeception' };
+  }
   if (solicitation) return { risk: 'elevated', reason: 'sensitiveRequest' };
   if (deceptiveLink) return { risk: 'elevated', reason: 'destinationDeception' };
   if (pressure && pretext) return { risk: 'elevated', reason: 'pressureAndPretext' };
-  if (action && (pretext || destinationConcern)) return { risk: 'elevated', reason: 'actionAndPretext' };
-  if (!hasText || findings.length) return { risk: 'uncertain', reason: 'limitedEvidence' };
-  return { risk: 'none', reason: 'noIndicators' };
+  const relatedConcern = action && requestTargets(linkActions).some((link) => link.signals.some((signal) => linkConcerns.has(signal)));
+  if (action && (pretext || relatedConcern || replyMismatch)) return { risk: 'elevated', reason: 'actionAndPretext' };
+  return { risk: 'uncertain', reason: 'limitedEvidence' };
 }
 
 function mask(value: string, spans: Span[]): string {
@@ -56,13 +72,31 @@ export function analyze(value: string, timestamp = new Date().toISOString()): An
       findings.push({ signal, span: link.span, contextual: isContextual(value, link.span) });
     }
   }
+  const sections = groupFindings(value, findings);
+  let assessment: Pick<Analysis, 'risk' | 'reason'> = !hasText || findings.length
+    ? { risk: 'uncertain', reason: 'limitedEvidence' }
+    : { risk: 'none', reason: 'noIndicators' };
+  let linkIndex = 0;
+  for (const section of sections) {
+    const start = linkIndex;
+    while (links[linkIndex] && links[linkIndex].span.start < section.end) linkIndex++;
+    const active = section.findings.filter((finding) => !finding.contextual);
+    if (!active.length) continue;
+    // Keep benign links in the sequence so a later link cannot replace an earlier target.
+    const scopedLinks = links.slice(start, linkIndex);
+    const scopedCoverage = coverage.slice(start, linkIndex);
+    const contextualStarts = new Set(section.findings.filter((finding) => finding.contextual).map((finding) => finding.span.start));
+    const candidates = scopedLinks.map((link) => contextualStarts.has(link.span.start) ? { ...link, signals: [] } : link);
+    const result = assess(value, active, candidates, scopedCoverage, Boolean(headers.finding && !headers.finding.contextual));
+    if (riskRank[result.risk] > riskRank[assessment.risk]) assessment = result;
+  }
   findings.sort((a, b) => Number(a.contextual) - Number(b.contextual) || priority(a.signal) - priority(b.signal) || a.span.start - b.span.start);
 
   const unavailable: Analysis['unavailable'] = ['linkAccess', 'senderAuthentication'];
   if (!headers.compared) unavailable.unshift('senderHeaders');
   if (!hasText) unavailable.unshift('text');
   if (!links.length) unavailable.unshift('links');
-  return { timestamp, method: METHOD, ...assess(findings, hasText), findings, links, unavailable };
+  return { timestamp, method: METHOD, ...assessment, findings, links, unavailable };
 }
 
 function priority(signal: Signal): number {

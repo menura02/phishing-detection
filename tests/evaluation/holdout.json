@@ -1,0 +1,14 @@
+[
+  {"id":"tr-mfa","language":"tr","label":"phishing","text":"Destek ekibinden yazıyoruz. Hesabınız askıya alınacak. Oturum açma isteğini onaylayın."},
+  {"id":"tr-address","language":"tr","label":"phishing","text":"Paketiniz teslim edilemedi. Teslimat adresinizi güncelleyin: [example.net](https://address-confirm.example/form)"},
+  {"id":"tr-vague","language":"tr","label":"phishing","text":"Merhaba, senin için bir belge bıraktım. Bir göz atar mısın? https://shared-docs.example/n/38"},
+  {"id":"en-credentials","language":"en","label":"phishing","text":"Send your verification code using this link: https://paypal.com@secure-help.example/check"},
+  {"id":"en-remote","language":"en","label":"phishing","text":"This is the support team. Act immediately. Install TeamViewer."},
+  {"id":"en-vague","language":"en","label":"phishing","text":"Are these your photos? https://album-view.example/a/5"},
+  {"id":"tr-separate","language":"tr","label":"legitimate","text":"Hesabınızı doğrulayın: https://account.example.org/verify\n\nKaynaklar: [example.org](https://docs-host.example/guide)"},
+  {"id":"tr-plain","language":"tr","label":"legitimate","text":"Kargonuz bugün teslim edildi. Teslimat detayları uygulamanızda."},
+  {"id":"tr-forwarded","language":"tr","label":"legitimate","text":"Hesabınızı doğrulayın: https://account.example.org\n----- İletilen ileti -----\nDestek kaydı: [example.net](https://ticket.example/history)"},
+  {"id":"en-footer","language":"en","label":"legitimate","text":"Verify your account at https://account.example.org.\n-- \nCustomer Service\n[example.org](https://links-service.example/help)"},
+  {"id":"en-unrelated-same-line","language":"en","label":"legitimate","text":"Verify your account at https://account.example.org. Documentation: [example.org](https://docs-service.example/start)"},
+  {"id":"en-auth","language":"en","label":"legitimate","text":"A new login was detected. If this was you, no action is required. Never share your verification code."}
+]

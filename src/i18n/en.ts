@@ -23,7 +23,7 @@ export const en = {
   scope: 'This result covers only the checks that could be applied.',
   findings: 'Findings and reasons',
   noFindings: 'The applicable rules did not flag any details.',
-  contextual: 'Quotation or warning context detected',
+  contextual: 'Quotation, warning or signature context detected',
   excerpt: 'Evidence in the message',
   links: 'Inspected links',
   linkClean: 'No structural warning from the applicable link rules.',

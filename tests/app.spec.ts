@@ -55,7 +55,7 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   const report = page.locator('#print-report');
   await expect(report).toBeVisible();
   await expect(report).toContainText('Analysis time');
-  await expect(report).toContainText('local-phishing-rules 2.0.0');
+  await expect(report).toContainText('local-phishing-rules 2.1.0');
   await expect(report).not.toContainText('local-test');
   await expect(page.locator('#editor')).toBeHidden();
   await page.screenshot({ path: testInfo.outputPath('print-report.png'), fullPage: true });

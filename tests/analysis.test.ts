@@ -89,6 +89,29 @@ test('correlates a Turkish delivery pretext, information update and deceptive de
   assert.equal(analyze('Kargonuz teslim edilemedi. Teslimat adresinizi güncelleyin.').risk, 'elevated');
 });
 
+test('links only the nearest explicit target to a request in the same section', () => {
+  assert.equal(analyze('Verify your account using this link:\n[example.org](https://bad.example/check)').reason, 'actionAndDeception');
+  for (const input of [
+    'Verify your account at https://account.example.org. [example.org](https://bad.example/check)',
+    'Verify your account. Documentation: [example.org](https://bad.example/check)',
+    'Verify your account.\n\n[example.org](https://bad.example/check)',
+    'Verify your account.\n----- Forwarded message -----\n[example.org](https://bad.example/check)',
+  ]) {
+    assert.equal(analyze(input).reason, 'destinationDeception');
+  }
+});
+
+test('keeps quoted and signature evidence visible and evaluates forwarded requests separately', () => {
+  for (const divider of ['-- \n', 'Saygılarımla,\n', '> ']) {
+    const result = analyze('Hesabınızı doğrulayın.\n' + divider + '[example.org](https://bad.example/check)');
+    assert.equal(result.risk, 'uncertain');
+    assert.ok(result.findings.some((finding) => finding.signal === 'mismatch' && finding.contextual));
+  }
+  const forwarded = analyze('Can you review the email below?\n----- Forwarded message -----\nSend your password: https://example.org@bad.example');
+  assert.equal(forwarded.reason, 'requestAndDeception');
+  assert.equal(analyze('This is your bank.\n\nYour account will be suspended.\n\nSend your password.').risk, 'elevated');
+});
+
 test('identifies English invoice callback and device access tactics', () => {
   const result = analyze('Unauthorized charge. If you did not authorize this purchase, call support. Install AnyDesk and approve the sign-in request. Open the attached invoice. Scan the QR code.');
   const signals = new Set(result.findings.map((item) => item.signal));
@@ -154,7 +177,7 @@ test('report carries method, time and limitations without leaking content by def
   assert.equal(report.timestamp, '2026-10-01T08:00:00.000Z');
   assert.equal(report.analysisType, 'phishing');
   assert.equal(report.schemaVersion, 2);
-  assert.equal(report.method.version, '2.0.0');
+  assert.equal(report.method.version, '2.1.0');
   assert.equal(report.assessment.level, 'elevated');
   assert.equal(report.assessment.reason.id, 'sensitiveRequest');
   assert.deepEqual(report.unavailable.map(({ id }) => id), ['senderHeaders', 'linkAccess', 'senderAuthentication']);

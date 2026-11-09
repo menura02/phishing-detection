@@ -25,7 +25,7 @@ export const tr: typeof en = {
   scope: 'Sonuç yalnızca uygulanabilen kontrolleri kapsar.',
   findings: 'Bulgular ve gerekçeleri',
   noFindings: 'Uygulanabilen kurallar herhangi bir belirti işaretlemedi.',
-  contextual: 'Alıntı veya uyarı bağlamı görüldü',
+  contextual: 'Alıntı, uyarı veya imza bağlamı görüldü',
   excerpt: 'Mesajdaki ilgili bölümler',
   links: 'İncelenen bağlantılar',
   linkClean: 'Uygulanabilen bağlantı kuralları yapısal bir uyarı vermedi.',
