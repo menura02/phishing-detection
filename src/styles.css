@@ -75,6 +75,11 @@ textarea[aria-invalid="true"] { border-color: var(--danger); }
 .risk-high .eyebrow { color: var(--danger); }
 .risk h3 { font-size: clamp(1.25rem, 2.4vw, 1.75rem); line-height: 1.2; margin-block: .3rem; }
 .risk .muted { margin-top: .4rem; }
+.research { margin-top: 1rem; padding: .85rem 1.15rem; overflow-wrap: anywhere; }
+.research > p, .research ul { margin-top: .45rem; }
+.research a, .intel-result a { color: var(--accent-dark); }
+.intel-match { border-inline-start: .2rem solid var(--warn); }
+.intel-match strong { color: var(--warn); }
 .result-section { padding: 1rem 1.25rem; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 .result-section h3 { font-size: 1rem; margin-bottom: .35rem; }
 .result-section > p + p, .result-section > div + p { margin-top: .5rem; }

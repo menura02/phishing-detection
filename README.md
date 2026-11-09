@@ -1,6 +1,6 @@
 # Kimlik Avı Kontrolü
 
-Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.3.0`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
+Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.4.0`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
 
 ## Yerelde çalıştırma
 
@@ -37,9 +37,23 @@ Senaryo örnekleri için [FTC kimlik avı rehberi](https://consumer.ftc.gov/arti
 
 ## Gizlilik ve güvenlik
 
-Mesaj, dosya ve analiz uygulama tarafından yalnızca açık sekmenin belleğinde tutulur. Analiz ağ isteği başlatmaz. Uygulama kullanıcı içeriğini günlüklere, kalıcı tarayıcı depolarına veya analitik sistemlerine yazmaz. Kullanıcı içeriği metin olarak gösterilir ve incelenen URL’ler tıklanabilir değildir. Statik çıktının içerik güvenlik politikası ağ bağlantılarını, harici kaynakları ve form gönderimlerini engeller.
+Mesaj, dosya ve analiz uygulama tarafından yalnızca açık sekmenin belleğinde tutulur. Analiz ağ isteği başlatmaz. Sayfa açılırken uygulamanın kendi sunucusundan genel tehdit veri dosyası yüklenir. Uygulama kullanıcı içeriğini günlüklere, kalıcı tarayıcı depolarına veya analitik sistemlerine yazmaz. Kullanıcı içeriği metin olarak gösterilir ve incelenen URL’ler tıklanabilir değildir. İçerik güvenlik politikası harici kaynak yüklemelerini ve form gönderimlerini engeller.
 
 Varsayılan raporlar yalnızca bulgu kategorilerini ve açıklamalarını içerir. İçerik ekleme seçeneği özgün metni, alıntıları ve tam URL’leri iki rapor biçimine de dahil eder. Bu alanlar hassas veri içerebilir. İndirilen veya yazdırılan kopyalar tarayıcı ve kullanıcının seçtiği cihaz konumları tarafından yönetilir.
+
+## Tehdit istihbaratı
+
+```sh
+npm run intel:sync
+npm run dev
+```
+
+`intel:sync` iki kaynağı hemen yeniler. Otomatik yenileme için ayrı bir terminalde `npm run intel:watch` çalıştır. Süreç açıkken her saat güncelleme vadesine bakar. Zararlı adresleri 24 saatte bir, araştırma adaylarını 7 günde bir yeniler. Sayfayı tekrar açtığında en son veri dosyası alınır. Bir kaynak hata verirse onun son başarılı verisi korunur ve diğer kaynak bağımsız güncellenir. Kurulum veya geliştirme komutu tek başına harici kaynaklara bağlanmaz.
+
+- **Zararlı adresler.** SGB API’sinden son 14 günde kaydedilen phishing alan adları ve URL’ler alınır. Ürün tam ana makine adı veya tam URL eşleştirmesi yapar. URL’de sorgu parametreleri korunur, sayfa içi parça kaldırılır. Alt alan adlarına ve ortak barındırma alanındaki diğer yollara eşleşme yayılmaz. Kaynak ve veri tarihi sonuçta ve raporda gösterilir. İki günü aşan veri eski olarak işaretlenir. Eşleşme yoksa yalnızca bu veri dosyasında kayıt bulunmadığı belirtilir. Bu bulgu, kural tabanlı riskten ayrı gösterilir. [SGB API](https://siberguvenlik.gov.tr/api/)
+- **Teknik araştırmalar.** Microsoft’un phishing konu sayfasındaki makaleler başlık, tarih ve kaynak bağlantısıyla inceleme kuyruğuna alınır. Desteklenen konular otomatik etiketlenir. Yeni tespit kuralları için aday saldırı ve meşru karşı örneği değerlendirme setine ekleyip sonuçları karşılaştır. Araştırma listesi tespit kurallarını kendiliğinden değiştirmez. [Microsoft phishing araştırmaları](https://www.microsoft.com/en-us/security/blog/threat-intelligence/social-engineering-phishing/)
+
+Yerel `.intel/` önbelleği Git’e dahil edilmez. Adresler SHA-256 özetleri olarak tutulur. Üretim derlemesi varsa güncelleyici aynı veri dosyasını `dist/` içine de yazar. Bu iş akışı yerel kullanım içindir. Veri dosyasını üçüncü taraflara dağıtmadan önce kaynakların dağıtım koşulları ayrıca doğrulanmalıdır. Adres eşleştirmesi için Web Crypto destekli HTTPS veya loopback önizleme gerekir.
 
 ## Geliştirme ve doğrulama
 

@@ -1,7 +1,10 @@
 import { messages } from '../i18n/index.ts';
+import { INTEL_SOURCE, INTEL_SOURCE_URL, type IntelligenceResult } from './intelligence.ts';
 import type { Analysis, Language, Span } from './types.ts';
 
-export function createReport(analysis: Analysis, value: string, language: Language, includeContent = false) {
+export function createReport(
+  analysis: Analysis, value: string, language: Language, includeContent = false, intelligence?: IntelligenceResult,
+) {
   const copy = messages[language];
   return {
     schemaVersion: 2,
@@ -24,6 +27,7 @@ export function createReport(analysis: Analysis, value: string, language: Langua
     unavailable: analysis.unavailable.map((id) => ({ id, explanation: copy.checks[id] })),
     limitations: [copy.limitText],
     nextSteps: copy.steps,
+    ...(intelligence ? { intelligence: { source: INTEL_SOURCE, sourceUrl: INTEL_SOURCE_URL, ...intelligence } } : {}),
     ...(includeContent ? { originalText: value } : {}),
   };
 }

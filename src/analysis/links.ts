@@ -12,8 +12,8 @@ function restoreAddress(raw: string): string {
   return raw.replace(/^hxxp(s?):/iu, 'http$1:').replaceAll('[.]', '.');
 }
 
-function urlFrom(raw: string): URL | undefined {
-  const value = raw.trim();
+export function urlFrom(raw: string): URL | undefined {
+  const value = restoreAddress(raw.trim());
   if (!value.startsWith('//') && !/^[a-z][a-z\d+.-]*:\/\//iu.test(value) &&
       !hostnamePattern.test(value) && !/^(?:\d{1,3}\.){3}\d{1,3}(?=[:/?#]|$)/u.test(value)) return;
   try {

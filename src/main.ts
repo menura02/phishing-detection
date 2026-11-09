@@ -1,5 +1,8 @@
 import './styles.css';
 import { analyze } from './analysis/analyze.ts';
+import {
+  INTEL_SOURCE, INTEL_SOURCE_URL, MAX_SNAPSHOT_BYTES, matchIntelligence, validateSnapshot, type IntelligenceResult, type Snapshot,
+} from './analysis/intelligence.ts';
 import { characterCount, readTextFile, validateText } from './analysis/input.ts';
 import { createReport, mergeSpans } from './analysis/report.ts';
 import type { Analysis, Language } from './analysis/types.ts';
@@ -42,6 +45,7 @@ app.innerHTML = `
         <div id="result-body"></div>
       </section>
     </div>
+    <details id="research" class="panel research"></details>
     <p class="sr-only" role="status" id="status"></p>
   </main>
   <footer class="frame" id="footer"></footer>
@@ -67,11 +71,32 @@ const printReport = byId('print-report');
 
 let language: Language = 'tr';
 let analysis: Analysis | undefined;
+let intelligence: IntelligenceResult | undefined;
 let includeContent = false;
 let revision = 0;
 let busy: 'reading' | 'running' | undefined;
 let error: keyof typeof messages.en.errors | 'failed' | undefined;
 let notice: 'changed' | 'cleared' | 'downloadFailed' | undefined;
+
+async function loadSnapshot(): Promise<Snapshot> {
+  try {
+    const response = await fetch('./intel.json', { cache: 'no-cache', signal: AbortSignal.timeout(4000) });
+    if (!response.ok) return { schema: 1 };
+    const body = await response.text();
+    if (body.length > MAX_SNAPSHOT_BYTES) return { schema: 1 };
+    return validateSnapshot(JSON.parse(body));
+  } catch {
+    // The core rules still work when the optional snapshot cannot be read.
+  }
+  return { schema: 1 };
+}
+
+const snapshotReady = loadSnapshot();
+let snapshot: Snapshot = { schema: 1 };
+void snapshotReady.then((data) => {
+  snapshot = data;
+  renderResearch();
+});
 
 function list(values: string[], ordered = false) {
   const node = element(ordered ? 'ol' : 'ul');
@@ -83,6 +108,65 @@ function section(title: string, ...children: HTMLElement[]) {
   const node = element('section', undefined, 'result-section');
   node.append(element('h3', title), ...children);
   return node;
+}
+
+function localizedTime(value: string) {
+  return new Date(value).toLocaleString(language, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function renderResearch() {
+  const copy = messages[language].intel;
+  const panel = byId('research');
+  panel.replaceChildren(element('summary', copy.research), element('p', copy.review, 'muted'));
+  if (snapshot.techniques?.updatedAt) {
+    panel.append(element('p', copy.updated + ' · ' + localizedTime(snapshot.techniques.updatedAt), 'muted'));
+  }
+  const candidates = snapshot.techniques?.candidates ?? [];
+  if (!candidates.length) {
+    panel.append(element('p', copy.noResearch));
+    return;
+  }
+  panel.append(element('p', copy.testCandidate, 'muted'));
+  const rows = element('ul');
+  for (const item of candidates) {
+    const row = element('li');
+    const link = element('a', item.title);
+    link.href = item.url;
+    link.rel = 'noreferrer';
+    const topics = item.topics.filter((topic) => Object.hasOwn(copy.topics, topic))
+      .map((topic) => copy.topics[topic as keyof typeof copy.topics]);
+    const date = new Date(item.published).toLocaleDateString(language, { dateStyle: 'medium', timeZone: 'UTC' });
+    row.append(link, element('p', [date, ...topics].join(' · '), 'muted'));
+    rows.append(row);
+  }
+  panel.append(rows);
+}
+
+function intelligenceSection(result: IntelligenceResult) {
+  const copy = messages[language];
+  const labels = copy.intel;
+  const content = [];
+  if (result.status === 'unavailable' || result.status === 'notApplicable') {
+    content.push(element('p', labels[result.status]));
+  } else {
+    if (result.status === 'stale') content.push(element('p', labels.stale));
+    content.push(element(result.matches.length ? 'strong' : 'p', result.matches.length ? labels.match : labels.noMatch));
+    if (result.matches.length) {
+      content.push(list(result.matches.map(({ number, kind }) => copy.linkNumber + ' ' + number + ' · ' + labels[kind])));
+    }
+    content.push(element('p', labels.updated + ' · ' + localizedTime(result.updatedAt!) +
+      ' / ' + labels.since + ' · ' + localizedTime(result.windowStart!), 'muted'));
+  }
+  const source = element('p', labels.source + ' · ', 'muted');
+  const sourceLink = element('a', INTEL_SOURCE);
+  sourceLink.href = INTEL_SOURCE_URL;
+  sourceLink.rel = 'noreferrer';
+  source.append(sourceLink);
+  content.push(source);
+  const panel = section(labels.title, ...content);
+  panel.classList.add('intel-result');
+  if (result.matches.length) panel.classList.add('intel-match');
+  return panel;
 }
 
 function showStatus(message: string) {
@@ -119,7 +203,7 @@ function renderPrint() {
   printReport.replaceChildren();
   if (!analysis) return;
   const copy = messages[language];
-  const report = createReport(analysis, input.value, language, includeContent);
+  const report = createReport(analysis, input.value, language, includeContent, intelligence);
   printReport.append(
     element('h1', `${PRODUCT_NAME[language]} · ${copy.report}`),
     element('p', copy.mode),
@@ -142,6 +226,7 @@ function renderPrint() {
       link.signals.map((signal) => copy.signals[signal][0]).join(', ') || copy.linkClean,
     ].filter(Boolean).join(' · ')))));
   }
+  if (report.intelligence) printReport.append(intelligenceSection(report.intelligence));
   printReport.append(
     section(copy.unavailable, list(report.unavailable.map((item) => item.explanation))),
     section(copy.limitations, list(report.limitations)),
@@ -168,7 +253,9 @@ function renderResult() {
     element('p', copy.mode, 'eyebrow'), element('h3', copy.risk[analysis.risk]),
     element('p', copy.reasons[analysis.reason]), element('p', copy.scope, 'muted'),
   );
+  if (intelligence?.matches.length) resultBody.append(intelligenceSection(intelligence));
   resultBody.append(risk);
+  if (intelligence && !intelligence.matches.length) resultBody.append(intelligenceSection(intelligence));
   const findings = element('ul', undefined, 'findings');
   for (const { signal, contextual, span } of analysis.findings) {
     const item = element('li');
@@ -246,7 +333,7 @@ function downloadReport() {
   byId('report-error').textContent = '';
   notice = undefined;
   try {
-    const report = createReport(analysis, input.value, language, includeContent);
+    const report = createReport(analysis, input.value, language, includeContent, intelligence);
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
     const anchor = element('a');
     anchor.href = url;
@@ -276,11 +363,13 @@ function setLanguage(next: Language) {
   input.placeholder = copy.placeholder;
   updateEditor();
   renderResult();
+  renderResearch();
 }
 
 function resetResult() {
   revision++;
   analysis = undefined;
+  intelligence = undefined;
   includeContent = false;
   busy = undefined;
   error = undefined;
@@ -317,7 +406,13 @@ form.addEventListener('submit', async (event) => {
   await new Promise<void>((resolve) => requestAnimationFrame(() => window.setTimeout(resolve, 0)));
   if (current !== revision) return;
   try {
-    analysis = analyze(input.value);
+    const result = analyze(input.value);
+    const matched = await matchIntelligence(result, await snapshotReady).catch(() => ({
+      status: 'unavailable' as const, matches: [],
+    }));
+    if (current !== revision) return;
+    analysis = result;
+    intelligence = matched;
   } catch {
     error = 'failed';
   }

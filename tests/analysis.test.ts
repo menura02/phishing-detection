@@ -1,9 +1,36 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { analyze } from '../src/analysis/analyze.ts';
+import { DAY_MS, digest, matchIntelligence, normalizeIndicator, validateSnapshot, type Snapshot } from '../src/analysis/intelligence.ts';
 import { characterCount, readTextFile, validateText } from '../src/analysis/input.ts';
 import { createReport, mergeSpans } from '../src/analysis/report.ts';
 import { MAX_CHARACTERS, MAX_FILE_BYTES } from '../src/config.ts';
+
+test('matches exact threat indicators without widening a host or URL path', async () => {
+  const updatedAt = '2026-11-09T06:00:00.000Z';
+  const windowStart = '2026-10-26T06:00:00.000Z';
+  const snapshot: Snapshot = {
+    schema: 1,
+    indicators: {
+      updatedAt, windowStart,
+      hosts: [await digest('reported.example')],
+      urls: [await digest('https://shared.example/bad?case=1')],
+    },
+  };
+  const text = 'hxxps://reported[.]example/ https://sub.reported.example/ https://shared.example/bad?case=1#anchor https://shared.example/clean https://shared.example/bad?case=2';
+  const analysis = analyze(text);
+  const result = await matchIntelligence(analysis, validateSnapshot(snapshot), Date.parse(updatedAt));
+  assert.deepEqual(result.matches, [{ number: 1, kind: 'host' }, { number: 3, kind: 'url' }]);
+  assert.equal(result.status, 'fresh');
+  assert.equal((await matchIntelligence(analysis, snapshot, Date.parse(updatedAt) + 3 * DAY_MS)).status, 'stale');
+  assert.equal((await matchIntelligence(analysis, { schema: 1 })).status, 'unavailable');
+  assert.equal((await matchIntelligence(analyze('hello'), snapshot)).status, 'notApplicable');
+  assert.equal(normalizeIndicator('https://reported.example@different.example/', 'host'), undefined);
+  assert.equal(normalizeIndicator('reported.example/path', 'host'), undefined);
+  const report = JSON.stringify(createReport(analysis, text, 'en', false, result));
+  assert.ok(!report.includes('reported.example') && !report.includes('case=1'));
+  assert.ok(report.includes(windowStart));
+});
 
 test('combining independent Turkish phishing signals yields high risk', () => {
   const result = analyze('Bankanızdan yazıyoruz. Hesabınız kapatılacak. DOĞRULAMA KODUNUZU GÖNDERİN.');

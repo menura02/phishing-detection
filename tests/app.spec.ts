@@ -1,5 +1,41 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { DAY_MS, digest } from '../src/analysis/intelligence.ts';
+
+test('renders research candidates and matches a reported link without sending the address', async ({ page }, testInfo) => {
+  const hostname = 'reported.example';
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(request.url()));
+  const now = new Date().toISOString();
+  const hosts = [await digest(hostname)];
+  await page.route('**/intel.json', (route) => route.fulfill({ json: {
+    schema: 1,
+    indicators: { updatedAt: now, windowStart: new Date(Date.now() - DAY_MS).toISOString(), hosts, urls: [] },
+    techniques: {
+      updatedAt: now,
+      candidates: [
+        { title: 'Device-code investigation', url: 'https://www.microsoft.com/en-us/security/blog/2026/04/06/device-code/', published: now, topics: ['deviceCode'] },
+        { title: 'Unsafe candidate', url: 'javascript:alert(1)', published: now, topics: [] },
+      ],
+    },
+  } }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByText('Phishing araştırmaları ve test adayları').click();
+  await expect(page.getByRole('link', { name: 'Device-code investigation' })).toBeVisible();
+  await expect(page.getByText('Unsafe candidate')).toHaveCount(0);
+  const afterLoad = requests.slice();
+  const input = page.getByRole('textbox');
+  await input.fill('https://' + hostname + '/private');
+  await page.getByRole('button', { name: 'Analiz et' }).click();
+  await expect(page.locator('#result-body .intel-match')).toContainText('Phishing olarak bildirilmiş adres eşleşti');
+  await expect(page.locator('#result-body .intel-match')).toContainText('Bağlantı 1 · tam ana makine adı');
+  await page.screenshot({ path: testInfo.outputPath('intel-mobile.png'), fullPage: true });
+  await input.fill('https://sub.' + hostname + '/private');
+  await page.getByRole('button', { name: 'Analiz et' }).click();
+  await expect(page.locator('#result-body')).toContainText('Bu listede kayıt bulunamadı');
+  expect(requests).toEqual(afterLoad);
+});
 
 test('analyzes UTF-8 files locally, changes language, exports JSON and prints a redacted report', async ({ page, context, baseURL }, testInfo) => {
   const errors: string[] = [];
@@ -32,7 +68,7 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   await expect(page.locator('#result-body').getByText('Sender and reply domains differ')).toBeVisible();
   await expect(page.locator('.risk')).toContainText('alongside a deceptive link pattern');
   await expect(page.locator('.inspected-links')).toContainText('Destination hostname · bad.example');
-  await page.locator('summary').click();
+  await page.locator('#result-body summary').click();
   await expect(page.locator('.evidence mark').filter({ hasText: 'Şifrenizi gönderin' })).toBeVisible();
   await expect(page.locator('.inspected-links a')).toHaveCount(0);
 
@@ -118,7 +154,7 @@ test('invalid files, XSS strings and URL-only messages produce safe states on mo
   await input.fill(payload);
   await expect(page.getByRole('button', { name: 'JSON indir' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Analiz et' }).click();
-  await page.locator('summary').click();
+  await page.locator('#result-body summary').click();
   await expect(page.locator('.evidence')).toHaveText(payload);
   await expect(page.locator('img, a[href^="javascript:"], [onerror]')).toHaveCount(0);
   await page.getByRole('checkbox').check();
