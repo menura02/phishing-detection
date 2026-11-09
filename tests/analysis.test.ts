@@ -80,6 +80,47 @@ test('unsupported and malformed links retain uncertainty', () => {
   }
 });
 
+test('correlates a Turkish delivery pretext, information update and deceptive destination', () => {
+  const result = analyze('Kargonuz teslim edilemedi. Teslimat adresinizi güncelleyin. [https://example.org](https://parcel-check.example/update)');
+  assert.equal(result.risk, 'high');
+  assert.equal(result.reason, 'actionAndDeception');
+  assert.deepEqual(new Set(result.findings.map((item) => item.signal)), new Set(['delivery', 'login', 'mismatch']));
+  assert.equal(analyze('Kargonuz teslim edilemedi.').risk, 'uncertain');
+  assert.equal(analyze('Kargonuz teslim edilemedi. Teslimat adresinizi güncelleyin.').risk, 'elevated');
+});
+
+test('identifies English invoice callback and device access tactics', () => {
+  const result = analyze('Unauthorized charge. If you did not authorize this purchase, call support. Install AnyDesk and approve the sign-in request. Open the attached invoice. Scan the QR code.');
+  const signals = new Set(result.findings.map((item) => item.signal));
+  assert.deepEqual(signals, new Set(['invoice', 'callback', 'remoteAccess', 'approval', 'attachment', 'qr']));
+  assert.equal(result.reason, 'sensitiveRequest');
+  assert.equal(analyze('Do not install AnyDesk.').risk, 'uncertain');
+  assert.equal(analyze('Security training example: “Open the attached invoice.”').findings[0].contextual, true);
+});
+
+test('compares pasted From and Reply-To addresses within a leading header block', () => {
+  const input = 'Kimden: Banka <alerts@notify.example.org>\nYanıt Adresi: case@receiver.example\n\nHesabınızı doğrulayın.';
+  const result = analyze(input);
+  const match = result.findings.find(({ signal }) => signal === 'replyMismatch')!;
+  assert.equal(input.slice(match.span.start, match.span.end), 'case@receiver.example');
+  assert.equal(result.reason, 'actionAndPretext');
+  assert.ok(!result.unavailable.includes('senderHeaders'));
+  assert.ok(result.unavailable.includes('senderAuthentication'));
+  assert.equal(analyze('From: a@mail.example.org\nReply-To: b@example.org\n\nHello').findings.length, 0);
+  assert.ok(analyze('Hello\n\nFrom: a@example.org\nReply-To: b@other.example').unavailable.includes('senderHeaders'));
+  assert.ok(analyze('From: a@example.org, b@example.org\nReply-To: c@other.example\n\nHello').unavailable.includes('senderHeaders'));
+});
+
+test('examines encoded parameters and download paths without resolving external destinations', () => {
+  const value = 'hxxps://support[.]example/leave?next=https%3A%2F%2Fother.example%2Fsetup https://cdn.example.org/setup%2Eexe example[.]org';
+  const result = analyze(value);
+  assert.deepEqual(result.links.map((link) => link.signals), [['redirect', 'defanged'], ['download'], ['defanged']]);
+  assert.deepEqual(result.links.map((link) => link.hostname), ['support.example', 'cdn.example.org', 'example.org']);
+  assert.equal(result.links[1].domain, 'example.org');
+  assert.equal(analyze('https://example.org/leave?next=https%3A%2F%2Fcdn.example.org').findings.length, 0);
+  assert.equal(result.risk, 'uncertain');
+});
+
 test('highlights keep UTF-16 offsets across emoji, Turkish casing and repeated phrases', () => {
   const phrase = 'ŞİFRENİZİ GÖNDERİN';
   const value = '😀 ' + phrase + '\n🔒 ' + phrase;
@@ -112,10 +153,12 @@ test('report carries method, time and limitations without leaking content by def
   const report = createReport(result, text, 'tr');
   assert.equal(report.timestamp, '2026-10-01T08:00:00.000Z');
   assert.equal(report.analysisType, 'phishing');
-  assert.equal(report.method.version, '1.0.0');
+  assert.equal(report.schemaVersion, 2);
+  assert.equal(report.method.version, '2.0.0');
   assert.equal(report.assessment.level, 'elevated');
-  assert.deepEqual(report.unavailable.map(({ id }) => id), ['linkAccess', 'ai', 'fact', 'source']);
-  assert.equal(report.limitations.length, 2);
+  assert.equal(report.assessment.reason.id, 'sensitiveRequest');
+  assert.deepEqual(report.unavailable.map(({ id }) => id), ['senderHeaders', 'linkAccess', 'senderAuthentication']);
+  assert.equal(report.limitations.length, 1);
   const json = JSON.stringify(report);
   for (const privateValue of [text, 'token=', 'Send your password', 'excerpt', 'originalText', 'example.org']) {
     assert.ok(!json.includes(privateValue));

@@ -3,8 +3,14 @@ import type { InspectedLink, Signal, Span } from './types.ts';
 
 const shorteners = new Set(['bit.ly', 't.co', 'tinyurl.com', 'ow.ly', 'is.gd', 'cutt.ly', 'rb.gy', 'goo.gl', 'buff.ly', 'rebrand.ly']);
 const brandDomains = ['paypal.com', 'microsoft.com', 'apple.com', 'google.com', 'amazon.com', 'netflix.com', 'turkiye.gov.tr', 'ziraatbank.com.tr'];
+const redirectKeys = new Set(['url', 'redirect', 'redirect_url', 'redirect_uri', 'return', 'returnto', 'continue', 'next', 'destination', 'target']);
+const riskyExtensions = /\.(?:exe|msi|scr|bat|cmd|ps1|js|vbs|hta|lnk|apk|iso|docm|xlsm|pptm)$/iu;
 const hostnamePattern = /^(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}][\p{L}\p{N}-]*\.?(?=[:/?#]|$)/iu;
-const looseLinks = /(?<![\p{L}\p{N}_@./-])(?:[a-z][a-z\d+.-]*:\/\/[^\s<>"']+|\/\/[^\s<>"']+|www\.[^\s<>"']+|(?:(?:\d{1,3}\.){3}\d{1,3}|(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+(?:xn--[\p{L}\p{N}-]+|[\p{L}]{2,63}))(?::\d+)?(?:[/?#][^\s<>"']*)?)(?![\p{L}\p{N}_@-])/giu;
+const looseLinks = /(?<![\p{L}\p{N}_@./-])(?:[a-z][a-z\d+.-]*:\/\/[^\s<>"']+|\/\/[^\s<>"']+|www\.[^\s<>"']+|(?:(?:\d{1,3}\.){3}\d{1,3}|(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?(?:\.|\[\.\]))+(?:xn--[\p{L}\p{N}-]+|[\p{L}]{2,63}))(?::\d+)?(?:[/?#][^\s<>"']*)?)(?![\p{L}\p{N}_@-])/giu;
+
+function restoreAddress(raw: string): string {
+  return raw.replace(/^hxxp(s?):/iu, 'http$1:').replaceAll('[.]', '.');
+}
 
 function urlFrom(raw: string): URL | undefined {
   const value = raw.trim();
@@ -25,13 +31,14 @@ function cleanTrailing(raw: string): string {
   return value;
 }
 
-function inspectTarget(raw: string, label?: string): Signal[] {
-  const url = urlFrom(raw);
-  if (!url) return ['unparsed'];
+function inspectTarget(raw: string, label?: string): Pick<InspectedLink, 'signals' | 'hostname' | 'domain'> {
+  const restored = restoreAddress(raw);
+  const url = urlFrom(restored);
+  if (!url) return { signals: ['unparsed'] };
 
   const host = url.hostname.replace(/\.$/u, '');
   const parts = parse(host, { allowPrivateDomains: true });
-  const shown = label && urlFrom(label);
+  const shown = label && urlFrom(restoreAddress(label));
   const signals: Signal[] = [];
   if (shown) {
     const shownHost = shown.hostname.replace(/\.$/u, '');
@@ -47,7 +54,8 @@ function inspectTarget(raw: string, label?: string): Signal[] {
   if (host.split('.').some((part) => part.startsWith('xn--'))) signals.push('punycode');
   if (url.username || url.password) signals.push('userinfo');
   if (shorteners.has(host) || (parts.domain && shorteners.has(parts.domain))) signals.push('shortener');
-  if (brandDomains.some((domain) => host.startsWith(domain + '.') && !host.endsWith('.' + domain))) {
+  if (brandDomains.some((domain) => ('.' + host + '.').includes('.' + domain + '.') &&
+    host !== domain && !host.endsWith('.' + domain))) {
     signals.push('subdomain');
   }
   const name = parts.domainWithoutSuffix;
@@ -56,7 +64,21 @@ function inspectTarget(raw: string, label?: string): Signal[] {
     return !host.endsWith('.' + domain) && host !== domain &&
       (name.split('-').includes(brand) || name.replaceAll('0', 'o').replaceAll('1', 'l') === brand);
   })) signals.push('lookalike');
-  return signals;
+  for (const [key, value] of url.searchParams) {
+    if (!redirectKeys.has(key.toLowerCase()) || !/^(?:https?:)?\/\//iu.test(value)) continue;
+    const target = urlFrom(value);
+    if (!target) continue;
+    const targetHost = target.hostname.replace(/\.$/u, '');
+    const targetDomain = parse(targetHost, { allowPrivateDomains: true }).domain ?? targetHost;
+    if (targetDomain !== (parts.domain ?? host)) {
+      signals.push('redirect');
+      break;
+    }
+  }
+  const path = url.pathname.replace(/%[0-9a-f]{2}/giu, (code) => String.fromCharCode(Number.parseInt(code.slice(1), 16)));
+  if (riskyExtensions.test(path)) signals.push('download');
+  if (restored !== raw) signals.push('defanged');
+  return { signals, hostname: host, domain: parts.domain ?? undefined };
 }
 
 function overlaps(a: Span, b: Span): boolean {
@@ -72,7 +94,7 @@ export function inspectLinks(value: string): { links: InspectedLink[]; coverage:
     const span = { start: base + range[0], end: base + range[1] };
     const raw = value.slice(span.start, span.end);
     coverage.push(outer);
-    links.push({ raw, span, signals: inspectTarget(raw, label) });
+    links.push({ raw, span, ...inspectTarget(raw, label) });
   }
 
   const anchors = /<a(?=\s|>)(?<attrs>(?:[^<>"'\n]|"[^"\n]*"|'[^'\n]*')*)>(?<label>[^<\n]*)<\/a\s*>/dgiu;
@@ -94,9 +116,9 @@ export function inspectLinks(value: string): { links: InspectedLink[]; coverage:
     const raw = cleanTrailing(match[0]);
     const span = { start: match.index, end: match.index + raw.length };
     if (!raw || coverage.some((existing) => overlaps(existing, span))) continue;
-    if (!urlFrom(raw) && !/^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(raw)) continue;
+    if (!urlFrom(restoreAddress(raw)) && !/^(?:[a-z][a-z\d+.-]*:)?\/\//iu.test(raw)) continue;
     coverage.push(span);
-    links.push({ raw, span, signals: inspectTarget(raw) });
+    links.push({ raw, span, ...inspectTarget(raw) });
   }
 
   return { links: links.sort((a, b) => a.span.start - b.span.start), coverage: coverage.sort((a, b) => a.start - b.start) };

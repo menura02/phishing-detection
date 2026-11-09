@@ -6,9 +6,17 @@ const patterns: [Signal, RegExp][] = [
   ['payment', /(?:iban|hesaba|cüzdana)[^\n.!?]{0,35}?(?:para gönderin|havale yap[ıi]n|transfer edin|ödeme yap[ıi]n)|(?:hediye kart[ıi]|kripto para|bitcoin|kapora|işlem ücreti)[^\n.!?]{0,40}?(?:al[ıi]n|ödeyin|gönderin)|(?:wire|transfer|send) (?:the |your |some )?(?:money|funds|bitcoin|crypto(?:currency)?)|(?:pay|send) (?:a |the )?(?:processing fee|release fee|deposit)|(?:buy|send|pay (?:with|in)) (?:\w+ )?gift cards?/giu],
   ['reward', /(?:ödül|hediye|çekiliş)[^\n.!?]{0,35}?(?:kazand[ıi]n[ıi]z|almaya hak kazand[ıi]n[ıi]z)|(?:you (?:have |just )?won|you have been selected for|claim) (?:a |your |the )?(?:prize|lottery|reward|gift)|(?:guaranteed|risk-free) (?:returns?|profits?)/giu],
   ['impersonation', /(?:bankan[ıi]zdan|destek ekibinden|polis merkezinden|vergi dairesinden|kurye şirketinden) (?:ar[ıi]yoruz|yaz[ıi]yoruz|ulaş[ıi]yoruz)|(?:ben|biz) [^\n.!?]{0,30}?(?:destek ekibindeniz|polis memuruyum|bankan[ıi]z[ıi]z)|(?:this is|we are|i am) (?:calling |writing )?(?:from )?(?:your bank|(?:the )?(?:fraud department|support team|tax office|police))|(?:message|notice) from (?:your bank|the fraud department|the tax office)/giu],
+  ['delivery', /(?:kargonuz|paketiniz|gönderiniz)[^\n.!?]{0,45}?(?:teslim edilemedi|iade edilecek|adres eksik|beklemeye al[ıi]nd[ıi])|(?:your (?:parcel|package|shipment))[^\n.!?]{0,45}?(?:could not be delivered|was not delivered|is on hold|will be returned|incomplete address)/giu],
+  ['invoice', /(?:izniniz d[ıi]ş[ıi]nda (?:işlem|ödeme)|(?:faturan[ıi]z|aboneliğiniz) [^\n.!?]{0,30}?(?:ödenmedi|otomatik yenilendi|ask[ıi]ya al[ıi]nacak)|bekleyen borcunuz)|(?:unauthorized (?:charge|transaction)|(?:your )?subscription (?:has |was )?(?:automatically )?renewed|(?:your )?(?:invoice|payment) is overdue)/giu],
+  ['login', /(?:hesab[ıi]n[ıi]z[ıi]|ödeme bilgilerinizi|teslimat adresinizi)[^\n.!?]{0,35}?(?:doğrulay[ıi]n|güncelleyin)|(?:oturum aç[ıi]n|giriş yap[ıi]n)[^\n.!?]{0,30}?(?:doğrulamak|güncellemek) için|(?:verify|reactivate|unlock) your account|update your (?:billing information|payment details|delivery address)|(?:sign|log) in to (?:verify|restore|reactivate|unlock|update)/giu],
+  ['approval', /(?:oturum açma|giriş|mfa|bildirim) (?:isteğini|talebini|bildirimini) onaylay[ıi]n|(?:approve|accept) (?:the |your )?(?:sign-in|login|mfa|push|authentication) (?:request|prompt|notification)/giu],
+  ['remoteAccess', /(?:uzaktan erişim(?:e)? (?:izin verin|sağlay[ıi]n)|(?:anydesk|teamviewer|h[ıi]zl[ıi] yard[ıi]m)[^\n.!?]{0,25}?(?:kurun|yükleyin|aç[ıi]n))|(?:allow|grant|enable) (?:us )?(?:remote access|remote control)|(?:install|open|download) (?:anydesk|teamviewer|quick assist)/giu],
+  ['attachment', /(?:ekteki (?:dosyay[ıi]|faturay[ıi]|belgeyi) (?:aç[ıi]n|indirin)|makrolar[ıi] etkinleştirin)|(?:open|download|run) (?:the )?(?:attached (?:invoice|file|document)|attachment)|enable (?:editing|macros)/giu],
+  ['callback', /(?:bu (?:işlem|ödeme|sat[ıi]n alma) size ait değilse|iptal etmek için)[^\n.!?]{0,65}?(?:aray[ıi]n|ulaş[ıi]n)|(?:if you (?:did not|didn['’]t) (?:authorize|make|recognize) (?:this|the)[^\n.!?]{0,45}?(?:call|contact)|call [^\n.!?]{0,25}? to cancel)/giu],
+  ['qr', /(?:qr kodu(?:nu)? (?:taray[ıi]n|okutun)|(?:scan|use) (?:the |this )?qr code)/giu],
 ];
 
-const contextCue = /(?:\b(?:example|training|simulation|awareness|scammers?|never (?:send|share|enter|provide|pay)|do not (?:send|share|enter|provide|pay))\b|örnek|eğitim|simülasyon|doland[ıi]r[ıi]c[ıi]lar|asla (?:gönder|paylaş|yaz|gir)|(?:gönder|paylaş|girme|ödeme)[a-zçğıöşü]*may[ıi]n|(?:paylaş|gönder|gir)meyin)/iu;
+const contextCue = /(?:\b(?:phishing example|training example|security training|phishing simulation|security awareness|scammers? (?:may|often|can))\b|eğitim örneği|phishing örneği|kimlik av[ıi] örneği|simülasyon|doland[ıi]r[ıi]c[ıi]lar [^\n.!?]{0,35}?(?:isteyebilir|yazabilir|kullanabilir))/iu;
 
 export function isContextual(value: string, span: Span): boolean {
   const lineStart = value.lastIndexOf('\n', span.start - 1) + 1;
@@ -19,7 +27,7 @@ export function isContextual(value: string, span: Span): boolean {
   const context = value.slice(Math.max(0, lineStart - 180), lineStart).trimEnd().split('\n').at(-1) ?? '';
   const before = value.slice(lineStart, span.start);
   const sentencePrefix = before.slice(Math.max(before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?')) + 1);
-  if (contextCue.test(sentencePrefix) || /\b(?:never|do not|don['’]t)\s*$/iu.test(sentencePrefix)) return true;
+  if (/\b(?:never|do not|don['’]t)\s*$|(?:^|\s)asla\s*$/iu.test(sentencePrefix)) return true;
   return (contextCue.test(line) || contextCue.test(context)) && [...line.matchAll(quoted)].some((match) => (
     lineStart + match.index <= span.start && lineStart + match.index + match[0].length >= span.end
   ));
@@ -27,7 +35,7 @@ export function isContextual(value: string, span: Span): boolean {
 
 export function inspectText(value: string): Finding[] {
   // Dotted uppercase I folds to one UTF-16 code unit here, preserving the input offsets.
-  const searchable = value.replaceAll('İ', 'i');
+  const searchable = value.replaceAll('İ', 'i').replace(/[^\S\n]/gu, ' ');
   return patterns.flatMap(([signal, pattern]) => [...searchable.matchAll(pattern)].map((match) => ({
     signal, span: { start: match.index, end: match.index + match[0].length }, contextual: false,
   })));

@@ -1,6 +1,6 @@
-# Mesaj Kontrolü
+# Kimlik Avı Kontrolü
 
-Türkçe ve İngilizce mesaj, e-posta ve sosyal medya metinlerinde yaygın phishing belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulamanın ve JSON şemasının sürümleri ayrı tutulur. İlk uygulama sürümü `0.1.0`, analiz yöntemi `local-phishing-rules 1.0.0`, JSON şeması `1`.
+Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.2.0`, analiz yöntemi `local-phishing-rules 2.0.0`, JSON şeması `2`. Yeni JSON şeması risk gerekçesini ve gönderici kontrollerinin kapsamını içerir.
 
 ## Yerelde çalıştırma
 
@@ -16,18 +16,22 @@ npm run dev
 ## Kullanım
 
 1. Türkçe veya İngilizce arayüzü seç. İki dildeki kurallar her analizde birlikte çalışır.
-2. Mesajı yapıştır veya UTF-8 `.txt` dosyası seç. Sınırlar 20.000 Unicode kod noktası ve 100 KB (100.000 bayt).
+2. Mesajı yapıştır veya UTF-8 `.txt` dosyası seç. Elindeyse ilk satırlara `From:` ve `Reply-To:` (veya `Kimden:` ve `Yanıt Adresi:`) ekle. Sınırlar 20.000 Unicode kod noktası ve 100 KB (100.000 bayt).
 3. **Analiz et** ile gerekçeleri, metindeki vurguları, bağlantı bulgularını ve uygulanamayan kontrolleri incele.
 4. İstersen **JSON indir** veya **Yazdır / PDF olarak kaydet** düğmesini kullan. Özgün metin, alıntı ve tam URL eklemek için rapordaki seçeneği ayrıca işaretle.
 5. **Temizle** ile bu sekmedeki metni ve sonucu kaldır.
 
 ## Analiz yaklaşımı ve sınırlar
 
-Yerel ifade kuralları zaman baskısı, hassas veri talebi, ödeme, ödül ve kimlik iddiası arar. Açık uyarı ve alıntı bağlamları bulguların ağırlığını düşürür. Tekrarlanan göstergeler yeni risk kategorileri oluşturmaz. Yüksek risk için hassas bilgi ya da ödeme talebinin başka türden göstergelerle birleşmesi gerekir.
+Yerel ifade kuralları zaman baskısı, hassas veri veya ödeme talebi, ödül, kimlik iddiası, teslimat sorunu ve fatura uyarısı arar. Hesap doğrulama, oturum onayı, uzaktan erişim, ek dosya açma, geri arama ve QR okutma talepleri ayrı bulgular olarak gösterilir. Açık uyarı ve alıntı bağlamları bulguların ağırlığını düşürür. Tekrarlanan göstergeler yeni risk kategorileri oluşturmaz. Risk açıklaması, değerlendirmeyi belirleyen birleşimi gösterir. Örneğin bir işlem talebinin yanıltıcı bağlantıyla birlikte görülmesi yüksek risk üretebilir.
 
-Bağlantı hedefleri WHATWG `URL` ayrıştırıcısıyla incelenir. Paketle gelen Public Suffix List verisi, kaydedilebilir alan adını alt alan adından ayırır. Yerel örüntüler kullanıcı bilgisi, IP adresi, Punycode, kısaltıcı ve sınırlı bir kurum listesine dayanan alan adı benzerliklerini işaretler. Düz metindeki URL’ler, basit Markdown bağlantıları ve metin etiketli HTML çapaları desteklenir. Zengin biçimden düz metne yapıştırırken gizli hedef kaybolabilir. Yalnızca URL girilirse mesaj dili kontrol edilemez. Hedef içerik, itibar ve yönlendirmeler incelenmez.
+Bağlantı hedefleri WHATWG `URL` ayrıştırıcısıyla incelenir. Paketle gelen Public Suffix List verisi, kaydedilebilir alan adını alt alan adından ayırır. Yapısal kontroller kullanıcı bilgisi, IP, Punycode, kısaltıcı, benzer alan adı, başka bir alan adına işaret eden URL parametresi ve çalıştırılabilir dosya uzantılarını kapsar. Düz metin, `hxxps` veya `[.]` gösterimi, basit Markdown ve metin etiketli HTML bağlantıları desteklenir. Zengin biçimden düz metne yapıştırırken gizli hedef kaybolabilir.
 
-Sonuç istatistiksel olasılık yerine uygulanan kuralların özetidir. “Belirgin risk işareti bulunamadı” yalnızca kuralların bir belirti yakalamadığı anlamına gelir. Yeni dil kalıpları, karmaşık bağlantı biçimleri ve bağlam yanlış pozitif veya kaçırılan bulgulara yol açabilir. Bu araç sınırlı kapsamlı bir ön kontroldür. AI üretimi, iddia doğruluğu ve kaynak/köken ayrı kontrollerdir ve bu sürümde değerlendirilemez. İçeriğin AI ile üretilen payı çoğu durumda ölçülemez.
+Gönderici ve yanıt adresi kontrolü, başta bulunan düz metin başlıklarındaki birer adresin kaydedilebilir alan adını karşılaştırır. Meşru sistemler de ayrı yanıt alan adları kullanabilir. Gönderici kimlik doğrulaması, alan adı itibarı, hedef sayfa içeriği ve gerçek yönlendirmeler kontrol edilmez. Ek dosyalar açılmaz ve QR görselleri okunmaz.
+
+Sonuç istatistiksel olasılık yerine uygulanan kuralların özetidir. “Belirgin risk işareti bulunamadı” yalnızca kuralların bir belirti yakalamadığı anlamına gelir. Yeni dil kalıpları, karmaşık bağlantı biçimleri ve bağlam yanlış pozitif veya kaçırılan bulgulara yol açabilir.
+
+Senaryo örnekleri için [FTC kimlik avı rehberi](https://consumer.ftc.gov/articles/how-recognize-avoid-phishing-scams) ve [FTC SMS rehberi](https://consumer.ftc.gov/articles/how-recognize-and-report-spam-text-messages).
 
 ## Gizlilik ve güvenlik
 
@@ -52,11 +56,3 @@ Tarayıcı testleri statik üretim çıktısını kullanır ve önizleme sunucus
 - `src/i18n/` arayüz ve rapor çevirilerini, `src/config.ts` geçici ürün adını ve sınırları tutar.
 - `src/main.ts` ve `src/styles.css` ekran ve yazdırma akışını oluşturur.
 - `tests/` birim ve tarayıcı senaryolarını kapsar.
-
-## Sonraki fazlar
-
-1. Fotoğraflarda metadata ve doğrulanabilir köken. Metadata eksikliği AI üretimini, geçerli köken de iddiaların doğruluğunu tek başına kanıtlamaz.
-2. Seste sentetik üretim ve manipülasyon belirtileri. Dil, süre ve maliyet sınırları ayrıca değerlendirilir.
-3. Videoda kare, ses ve zaman içindeki değişimler. Birkaç kareden tüm video hakkında kesin hüküm verilmez.
-
-Faz sırası maliyet ve uygulanabilirliğe göre değişebilir. Gerçek AI metin tespiti ve kaynak destekli iddia doğrulama ayrı araştırma başlıklarıdır. Sağlayıcı eklemek için `ProviderAssessment` ortak sonuç biçimi sağlar. Harici işlemden önce veri aktarımı ve saklama koşulları açıklanmalı. Sunucu tarafında URL erişiminin ön koşulu SSRF korumasıdır. LLM entegrasyonunda incelenen içeriğin içindeki talimatlar güvenilmeyen veri olarak ele alınmalıdır.

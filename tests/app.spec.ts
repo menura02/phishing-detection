@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
-test('analyzes UTF-8 files locally, changes language, exports JSON and prints a redacted report', async ({ page, context }, testInfo) => {
+test('analyzes UTF-8 files locally, changes language, exports JSON and prints a redacted report', async ({ page, context, baseURL }, testInfo) => {
   const errors: string[] = [];
   const requests: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -9,17 +9,17 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
     if (message.type() === 'error') errors.push(message.text());
   });
   context.on('request', (request) => requests.push(request.url()));
-  await context.route(/^https?:\/\/(?!127\.0\.0\.1:4173\/)/u, (route) => route.abort());
+  await context.route((url) => /^https?:$/u.test(url.protocol) && url.origin !== baseURL, (route) => route.abort());
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Şüpheli bir mesajı incele');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Kimlik avı şüphesini incele');
   await page.screenshot({ path: testInfo.outputPath('desktop-start.png') });
   const initialRequests = requests.slice();
-  expect(initialRequests.every((url) => url.startsWith('http://127.0.0.1:4173/'))).toBeTruthy();
+  expect(initialRequests.every((url) => new URL(url).origin === baseURL)).toBeTruthy();
 
   await page.getByRole('button', { name: 'Analiz et' }).click();
   await expect(page.getByRole('alert')).toHaveText('Analiz etmek için bir mesaj veya bağlantı gir.');
-  const source = '🔒 Bankanızdan yazıyoruz. Hesabınız kapatılacak. Şifrenizi gönderin. https://paypal.com@bad.example/private?token=local-test';
+  const source = 'From: alerts@example.org\nReply-To: queue@bad.example\n\n🔒 Bankanızdan yazıyoruz. Hesabınız kapatılacak. Şifrenizi gönderin. https://paypal.com@bad.example/private?token=local-test';
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: '.txt dosyası seç' }).click();
   await (await chooser).setFiles({ name: 'mesaj.txt', mimeType: 'text/plain', buffer: Buffer.from(source) });
@@ -29,7 +29,9 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   await page.getByRole('button', { name: 'Analyze', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'High phishing risk' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Analysis result' })).toBeFocused();
-  await expect(page.locator('#result-body').getByText('AI generation — not assessed')).toBeVisible();
+  await expect(page.locator('#result-body').getByText('Sender and reply domains differ')).toBeVisible();
+  await expect(page.locator('.risk')).toContainText('alongside a deceptive link pattern');
+  await expect(page.locator('.inspected-links')).toContainText('Destination hostname · bad.example');
   await page.locator('summary').click();
   await expect(page.locator('.evidence mark').filter({ hasText: 'Şifrenizi gönderin' })).toBeVisible();
   await expect(page.locator('.inspected-links a')).toHaveCount(0);
@@ -39,9 +41,10 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   const downloaded = await file;
   expect(downloaded.suggestedFilename()).toBe('phishing-report.json');
   const raw = await readFile((await downloaded.path())!, 'utf8');
-  expect(JSON.parse(raw)).toMatchObject({ assessment: { level: 'high' }, language: 'en' });
+  expect(JSON.parse(raw)).toMatchObject({ assessment: { level: 'high', reason: { id: 'requestAndDeception' } }, language: 'en' });
   expect(raw).not.toContain('local-test');
   expect(raw).not.toContain('Şifrenizi gönderin');
+  expect(raw).not.toContain('bad.example');
 
   await page.evaluate(() => {
     window.print = () => { document.body.dataset.printCalled = 'yes'; };
@@ -52,7 +55,7 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   const report = page.locator('#print-report');
   await expect(report).toBeVisible();
   await expect(report).toContainText('Analysis time');
-  await expect(report).toContainText('local-phishing-rules 1.0.0');
+  await expect(report).toContainText('local-phishing-rules 2.0.0');
   await expect(report).not.toContainText('local-test');
   await expect(page.locator('#editor')).toBeHidden();
   await page.screenshot({ path: testInfo.outputPath('print-report.png'), fullPage: true });
@@ -110,7 +113,7 @@ test('invalid files, XSS strings and URL-only messages produce safe states on mo
   await page.getByRole('button', { name: 'Analiz et' }).click();
   await expect(page.getByRole('heading', { name: 'Belirsiz', exact: true })).toBeVisible();
   await expect(page.locator('#result-body').getByText('Mesaj dili değerlendirilemedi.', { exact: false })).toBeVisible();
-  await expect(page.locator('#result-body').getByText('Kaynak ve köken — değerlendirilemedi')).toBeVisible();
+  await expect(page.locator('#result-body').getByText('Gönderici kimlik doğrulaması ve alan adı itibarı kontrol edilmedi.')).toBeVisible();
   const payload = '<img src="https://bad.example/x" onerror="window.pwned=1"> Şifrenizi gönderin. [Open](javascript:alert)';
   await input.fill(payload);
   await expect(page.getByRole('button', { name: 'JSON indir' })).toHaveCount(0);

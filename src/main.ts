@@ -124,6 +124,7 @@ function renderPrint() {
     element('h1', `${PRODUCT_NAME[language]} · ${copy.report}`),
     element('p', copy.mode),
     element('h2', report.assessment.label),
+    element('p', report.assessment.reason.explanation),
     element('p', report.assessment.scope),
     element('p', `${copy.reportTime} · ${report.timestamp}`),
     element('p', `${copy.reportMethod} · ${report.method.id} ${report.method.version}`),
@@ -135,7 +136,9 @@ function renderPrint() {
   );
   if (report.links.length) {
     printReport.append(section(copy.links, list(report.links.map((link) => [
-      `${copy.linkNumber} ${link.number}`, 'url' in link ? link.url : '',
+      `${copy.linkNumber} ${link.number}`, link.url,
+      link.hostname ? `${copy.destination} · ${link.hostname}` : '',
+      link.domain ? `${copy.domain} · ${link.domain}` : '',
       link.signals.map((signal) => copy.signals[signal][0]).join(', ') || copy.linkClean,
     ].filter(Boolean).join(' · ')))));
   }
@@ -161,7 +164,10 @@ function renderResult() {
   }
 
   const risk = element('div', undefined, `risk risk-${analysis.risk}`);
-  risk.append(element('p', copy.mode, 'eyebrow'), element('h3', copy.risk[analysis.risk]), element('p', copy.scope));
+  risk.append(
+    element('p', copy.mode, 'eyebrow'), element('h3', copy.risk[analysis.risk]),
+    element('p', copy.reasons[analysis.reason]), element('p', copy.scope, 'muted'),
+  );
   resultBody.append(risk);
   const findings = element('ul', undefined, 'findings');
   for (const { signal, contextual, span } of analysis.findings) {
@@ -184,6 +190,16 @@ function renderResult() {
     for (const link of analysis.links) {
       const item = element('li');
       item.append(element('code', link.raw));
+      if (link.hostname) {
+        const target = element('p', undefined, 'muted');
+        target.append(copy.destination + ' · ', element('code', link.hostname));
+        item.append(target);
+      }
+      if (link.domain && link.domain !== link.hostname) {
+        const domain = element('p', undefined, 'muted');
+        domain.append(copy.domain + ' · ', element('code', link.domain));
+        item.append(domain);
+      }
       const reasons = link.signals.map((signal) => copy.signals[signal][0]);
       item.append(reasons.length ? list(reasons) : element('p', copy.linkClean));
       links.append(item);
@@ -192,7 +208,7 @@ function renderResult() {
   }
   resultBody.append(
     section(copy.unavailable, list(analysis.unavailable.map((check) => copy.checks[check]))),
-    section(copy.limitations, element('p', copy.limitText), element('p', copy.aiLimit)),
+    section(copy.limitations, element('p', copy.limitText)),
     section(copy.next, list(copy.steps, true)),
   );
 
