@@ -1,5 +1,6 @@
 node_modules/
 .intel/
+.evaluation/
 dist/
 test-results/
 playwright-report/

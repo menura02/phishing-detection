@@ -1,10 +1,11 @@
 import { messages } from '../i18n/index.ts';
 import { getGuidance } from './guidance.ts';
+import type { EmailEvidence } from './email.ts';
 import { INTEL_SOURCE, INTEL_SOURCE_URL, type IntelligenceResult } from './intelligence.ts';
 import type { Analysis, Language, Span } from './types.ts';
 
 export function createReport(
-  analysis: Analysis, value: string, language: Language, includeContent = false, intelligence?: IntelligenceResult,
+  analysis: Analysis, value: string, language: Language, includeContent = false, intelligence?: IntelligenceResult, email?: EmailEvidence,
 ) {
   const copy = messages[language];
   return {
@@ -28,6 +29,10 @@ export function createReport(
     unavailable: analysis.unavailable.map((id) => ({ id, explanation: copy.checks[id] })),
     limitations: [copy.limitText],
     ...getGuidance(analysis, language, intelligence),
+    ...(email ? { email: {
+      bodyFormat: email.bodyFormat, attachmentCount: email.attachments.length,
+      ...(includeContent ? email : {}),
+    } } : {}),
     ...(intelligence ? { intelligence: { source: INTEL_SOURCE, sourceUrl: INTEL_SOURCE_URL, ...intelligence } } : {}),
     ...(includeContent ? { originalText: value } : {}),
   };

@@ -1,11 +1,33 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { analyze } from '../src/analysis/analyze.ts';
+import { extractEmail, readEmailFile } from '../src/analysis/email.ts';
+import { exampleEmail } from './email-fixture.ts';
 import { messages } from '../src/i18n/index.ts';
 import { DAY_MS, digest, matchIntelligence, normalizeIndicator, validateSnapshot, type Snapshot } from '../src/analysis/intelligence.ts';
 import { characterCount, readTextFile, validateText } from '../src/analysis/input.ts';
 import { createReport, mergeSpans } from '../src/analysis/report.ts';
 import { MAX_CHARACTERS, MAX_FILE_BYTES } from '../src/config.ts';
+
+test('extracts email evidence and analyzes the actual destination without exposing private metadata in reports', async () => {
+  const { value, plain, evidence } = await extractEmail(new TextEncoder().encode(exampleEmail));
+  assert.equal(evidence.subject, 'Hesap kontrolü');
+  assert.deepEqual(evidence.from, ['support@example.org']);
+  assert.deepEqual(evidence.replyTo, ['help@reply.example']);
+  assert.deepEqual(evidence.attachments, [{ name: 'private-invoice.exe', mimeType: 'application/octet-stream' }]);
+  assert.ok(!value.includes('pixel.example') && !value.includes('emailCodeExecuted') && !value.includes('ZmFrZQ'));
+  const result = analyze(value);
+  assert.equal(result.reason, 'actionAndDeception');
+  assert.equal(result.links[0].raw, 'https://target.example/check?x=1&y=2');
+  assert.ok(result.findings.some(({ signal }) => signal === 'replyMismatch'));
+  assert.ok(!analyze(plain).findings.some(({ signal }) => signal === 'mismatch'));
+  assert.deepEqual(createReport(result, value, 'tr', false, undefined, evidence).email, {
+    bodyFormat: 'html', attachmentCount: 1,
+  });
+  assert.deepEqual(createReport(result, value, 'tr', true, undefined, evidence).email?.attachments, evidence.attachments);
+  assert.deepEqual(await readEmailFile(new File(['not an email'], 'bad.eml')), { error: 'emailRead' });
+  assert.deepEqual(await readEmailFile(new File([new Uint8Array(2_000_001)], 'large.eml')), { error: 'emailSize' });
+});
 
 test('report suggests independent verification and guidance relevant to active evidence', () => {
   const input = 'Send your password. Pay a processing fee. Scan the QR code. Install AnyDesk.';

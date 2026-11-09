@@ -1,6 +1,6 @@
 # Kimlik Avı Kontrolü
 
-Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.4.1`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
+Türkçe ve İngilizce e-posta, SMS ve bağlantılardaki kimlik avı belirtilerini açıklayan, tarayıcıda çalışan bir ön kontrol aracı. Uygulama sürümü `0.5.0`, analiz yöntemi `local-phishing-rules 2.1.0`, JSON şeması `2`.
 
 ## Yerelde çalıştırma
 
@@ -16,7 +16,7 @@ npm run dev
 ## Kullanım
 
 1. Türkçe veya İngilizce arayüzü seç. İki dildeki kurallar her analizde birlikte çalışır.
-2. Mesajı yapıştır veya UTF-8 `.txt` dosyası seç. Elindeyse ilk satırlara `From:` ve `Reply-To:` (veya `Kimden:` ve `Yanıt Adresi:`) ekle. Sınırlar 20.000 Unicode kod noktası ve 100 KB (100.000 bayt).
+2. Mesajı yapıştır veya bir dosya seç. UTF-8 `.txt` için sınır 100 KB, özgün `.eml` için 2 MB. Çıkarılan analiz metni en fazla 20.000 Unicode kod noktası olabilir. Düz metin kullanıyorsan elindeki `From:` ve `Reply-To:` (veya `Kimden:` ve `Yanıt Adresi:`) satırlarını en üste ekleyebilirsin.
 3. **Analiz et** ile gerekçeleri, metindeki vurguları, bağlantı bulgularını ve uygulanamayan kontrolleri incele.
 4. İstersen **JSON indir** veya **Yazdır / PDF olarak kaydet** düğmesini kullan. Özgün metin, alıntı ve tam URL eklemek için rapordaki seçeneği ayrıca işaretle.
 5. **Temizle** ile bu sekmedeki metni ve sonucu kaldır.
@@ -30,6 +30,8 @@ Motor, bir talebi aynı metin bölümünde hemen ardından gelen ilk bağlantıy
 Bağlantı hedefleri WHATWG `URL` ayrıştırıcısıyla incelenir. Paketle gelen Public Suffix List verisi, kaydedilebilir alan adını alt alan adından ayırır. Yapısal kontroller kullanıcı bilgisi, IP, Punycode, kısaltıcı, benzer alan adı, başka bir alan adına işaret eden URL parametresi ve çalıştırılabilir dosya uzantılarını kapsar. Düz metin, `hxxps` veya `[.]` gösterimi, basit Markdown ve metin etiketli HTML bağlantıları desteklenir. Zengin biçimden düz metne yapıştırırken gizli hedef kaybolabilir.
 
 Gönderici ve yanıt adresi kontrolü, başta bulunan düz metin başlıklarındaki birer adresin kaydedilebilir alan adını karşılaştırır. Meşru sistemler de ayrı yanıt alan adları kullanabilir. Gönderici kimlik doğrulaması, alan adı itibarı, hedef sayfa içeriği ve gerçek yönlendirmeler kontrol edilmez. Ek dosyalar açılmaz ve QR görselleri okunmaz.
+
+`.eml` dosyaları PostalMime ile cihazda ayrıştırılır. HTML gövde parse5 ile veri olarak okunur. Metin ve gerçek bağlantı hedefleri analiz metnine dönüştürülür. Dış görseller yüklenmez ve HTML çalıştırılmaz. Ekler için yalnızca dosya adı ve dosyada bildirilen tür gösterilir. Gönderenin kimliği doğrulanmaz. Analiz metnini düzenlemek, ekrandaki özgün dosya özetini kaldırır. Varsayılan raporda e-postanın konu, adres ve ek adı gibi alanları yerine gövde biçimi ve ek sayısı yer alır.
 
 Sonuç istatistiksel olasılık yerine uygulanan kuralların özetidir. “Belirgin risk işareti bulunamadı” yalnızca kuralların bir belirti yakalamadığı anlamına gelir. Yeni dil kalıpları, karmaşık bağlantı biçimleri ve bağlam yanlış pozitif veya kaçırılan bulgulara yol açabilir.
 
@@ -87,6 +89,20 @@ npm run evaluate -- holdout
 | Artmış veya yüksek risk alan phishing senaryosu | 4/6 | 4/6 |
 
 Bu ölçüm, seçilen senaryolardaki davranışı gösterir. Üretim doğruluğunu ölçmek için kimliksizleştirilmiş ve bağımsız doğrulanmış gerçek mesajlar gerekir.
+
+### Gerçek e-posta başlangıç ölçümü
+
+Nazario 2025 arşivinden phishing, Apache SpamAssassin `20030228_hard_ham` arşivinden meşru sınıfı için eşit aralıklı 80'er örnek seçildi. Aynı motor, önce HTML'deki görünen metin ve konu ile, sonra özgün dosyadan çıkarılan konu, gövde, başlıklar ve bağlantı hedefleri ile çalıştırıldı. Adres itibarı değerlendirmeye dahil edilmedi. Meşru sınıfta 3 dosya analiz giriş sınırlarına uymadığı için iki taraftan da çıkarıldı. Kaynak etiketleri arşivlere aittir. Setler farklı dönemlerden geldiği ve gerçek Türkçe e-postalar için doğrulanabilir ayrı bir sınıf bulunamadığı için bu sonuç güncel Türkçe trafiğe genellenemez.
+
+| Ölçüm | Görünen metin | Özgün dosya |
+| --- | ---: | ---: |
+| Artmış veya yüksek risk verilen phishing | 2/80 | 8/80 |
+| Artmış veya yüksek risk verilen meşru mesaj | 2/77 | 12/77 |
+| Yüksek risk verilen phishing veya meşru mesaj | 0 | 0 |
+
+Özgün dosya 67 phishing ve 52 meşru mesajda ek bağlantı hedefi sağladı. Ek kanıt hem bulunan saldırıları hem de meşru mesajlara verilen uyarıları artırdı.
+
+Tekrar çalıştırmak için [Nazario phishing-2025](https://monkey.org/~jose/phishing/phishing-2025) dosyasını `.evaluation/phishing-2025` yoluna, [Apache hard_ham](https://spamassassin.apache.org/old/publiccorpus/20030228_hard_ham.tar.bz2) dosyasını `.evaluation/hard-ham.tar.bz2` yoluna kaydet. `tar` komutu kurulu iken `npm run evaluate:email` çalıştır. Komut arşiv özetlerini ve yalnızca toplu ölçümleri yazar. Kaynak mesajlar Git’e girmez. Nazario arşivi José Nazario tarafından CC BY 4.0 koşuluyla yayımlanmıştır. SpamAssassin arşivindeki mesaj hakları özgün gönderenlere aittir. [Nazario arşiv notları](https://monkey.org/~jose/phishing/README.txt) · [SpamAssassin arşiv notları](https://spamassassin.apache.org/old/publiccorpus/readme.html)
 
 - `src/analysis/` girdiyi, kuralları, sonuç tiplerini ve rapor şemasını içerir.
 - `src/i18n/` arayüz ve rapor çevirilerini, `src/config.ts` geçici ürün adını ve sınırları tutar.

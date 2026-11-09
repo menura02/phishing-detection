@@ -1,6 +1,35 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { DAY_MS, digest } from '../src/analysis/intelligence.ts';
+import { exampleEmail } from './email-fixture.ts';
+
+test('loads an original email locally, shows metadata and clears metadata after editing', async ({ page, context }, testInfo) => {
+  const external: string[] = [];
+  await context.route('https://**', (route) => {
+    external.push(route.request().url());
+    return route.abort();
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: '.txt veya .eml dosyası seç' }).click();
+  await (await chooser).setFiles({ name: 'original.eml', mimeType: 'message/rfc822', buffer: Buffer.from(exampleEmail) });
+  await expect(page.getByRole('textbox')).toHaveValue(/target\.example/);
+  await page.getByRole('button', { name: 'Analiz et' }).click();
+  await expect(page.getByRole('heading', { name: 'E-postadan çıkarılan bilgiler' })).toBeVisible();
+  await expect(page.locator('#result-body')).toContainText('private-invoice.exe');
+  await expect(page.locator('#result-body')).toContainText('Gönderici ve yanıt alan adları farklı');
+  await expect(page.locator('#result-body')).toContainText('Görünen adres hedefle uyuşmuyor');
+  await expect(page.locator('#print-report')).not.toContainText('private-invoice.exe');
+  await expect(page.locator('#print-report')).not.toContainText('help@reply.example');
+  await expect(page.locator('img[src*="pixel.example"], [onerror]')).toHaveCount(0);
+  await page.getByRole('heading', { name: 'E-postadan çıkarılan bilgiler' }).locator('..')
+    .screenshot({ path: testInfo.outputPath('email-evidence-mobile.png') });
+  await page.getByRole('textbox').fill('Normal message');
+  await page.getByRole('button', { name: 'Analiz et' }).click();
+  await expect(page.getByRole('heading', { name: 'E-postadan çıkarılan bilgiler' })).toHaveCount(0);
+  expect(external).toEqual([]);
+});
 
 test('renders research candidates and matches a reported link without sending the address', async ({ page }, testInfo) => {
   const hostname = 'reported.example';
@@ -58,7 +87,7 @@ test('analyzes UTF-8 files locally, changes language, exports JSON and prints a 
   await expect(page.getByRole('alert')).toHaveText('Analiz etmek için bir mesaj veya bağlantı gir.');
   const source = 'From: alerts@example.org\nReply-To: queue@bad.example\n\n🔒 Bankanızdan yazıyoruz. Hesabınız kapatılacak. Şifrenizi gönderin. https://paypal.com@bad.example/private?token=local-test';
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: '.txt dosyası seç' }).click();
+  await page.getByRole('button', { name: '.txt veya .eml dosyası seç' }).click();
   await (await chooser).setFiles({ name: 'mesaj.txt', mimeType: 'text/plain', buffer: Buffer.from(source) });
   await expect(page.getByRole('textbox')).toHaveValue(source);
   await page.getByRole('button', { name: 'English' }).click();
@@ -144,7 +173,7 @@ test('invalid files, XSS strings and URL-only messages produce safe states on mo
   await page.goto('/');
   const file = page.locator('#file');
   await file.setInputFiles({ name: 'example.pdf', mimeType: 'application/pdf', buffer: Buffer.from('test') });
-  await expect(page.getByRole('alert')).toHaveText('Bir .txt dosyası seç.');
+  await expect(page.getByRole('alert')).toHaveText('Bir .txt veya .eml dosyası seç.');
   await file.setInputFiles({ name: 'example.txt', mimeType: 'text/plain', buffer: Buffer.from([0xff, 0xfe]) });
   await expect(page.getByRole('alert')).toContainText('UTF-8');
   const input = page.getByRole('textbox');

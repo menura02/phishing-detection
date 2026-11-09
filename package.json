@@ -1,6 +1,6 @@
 {
   "name": "message-check",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,10 +15,13 @@
     "test": "node --test tests/analysis.test.ts",
     "test:browser": "playwright test",
     "evaluate": "node tests/evaluation/run.ts",
+    "evaluate:email": "node tests/evaluation/email-corpus.ts",
     "intel:sync": "node scripts/intel.ts sync",
     "intel:watch": "node scripts/intel.ts watch"
   },
   "dependencies": {
+    "parse5": "8.1.1",
+    "postal-mime": "4.2.0",
     "tldts": "7.4.19"
   },
   "devDependencies": {

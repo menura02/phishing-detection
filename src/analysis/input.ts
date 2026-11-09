@@ -1,6 +1,6 @@
 import { MAX_CHARACTERS, MAX_FILE_BYTES } from '../config.ts';
 
-export type InputError = 'empty' | 'tooLong' | 'fileType' | 'fileSize' | 'fileEncoding' | 'fileRead';
+export type InputError = 'empty' | 'tooLong' | 'fileType' | 'fileSize' | 'fileEncoding' | 'fileRead' | 'emailSize' | 'emailRead';
 
 export function characterCount(value: string): number {
   return Array.from(value).length;

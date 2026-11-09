@@ -1,10 +1,11 @@
 import './styles.css';
 import { analyze } from './analysis/analyze.ts';
+import type { EmailEvidence } from './analysis/email.ts';
 import { getGuidance } from './analysis/guidance.ts';
 import {
   INTEL_SOURCE, INTEL_SOURCE_URL, MAX_SNAPSHOT_BYTES, matchIntelligence, validateSnapshot, type IntelligenceResult, type Snapshot,
 } from './analysis/intelligence.ts';
-import { characterCount, readTextFile, validateText } from './analysis/input.ts';
+import { characterCount, readTextFile, validateText, type InputError } from './analysis/input.ts';
 import { createReport, mergeSpans } from './analysis/report.ts';
 import type { Analysis, Language } from './analysis/types.ts';
 import { MAX_CHARACTERS, PRODUCT_NAME } from './config.ts';
@@ -33,7 +34,7 @@ app.innerHTML = `
         <p id="error" class="error" role="alert" hidden></p>
         <div class="file-area">
           <button type="button" class="button subtle" id="upload"></button>
-          <input type="file" id="file" accept=".txt,text/plain" hidden>
+          <input type="file" id="file" accept=".txt,.eml,text/plain,message/rfc822" hidden>
           <small id="limits"></small>
         </div>
         <div class="actions">
@@ -72,6 +73,7 @@ const printReport = byId('print-report');
 
 let language: Language = 'tr';
 let analysis: Analysis | undefined;
+let email: EmailEvidence | undefined;
 let intelligence: IntelligenceResult | undefined;
 let includeContent = false;
 let revision = 0;
@@ -200,11 +202,27 @@ function makeEvidence(result: Analysis, value: string) {
   return evidence;
 }
 
+function emailSection(data: Partial<EmailEvidence> & Pick<EmailEvidence, 'bodyFormat'> & { attachmentCount: number }) {
+  const copy = messages[language].email;
+  const fields = [
+    copy.format + ' · ' + copy[data.bodyFormat],
+    copy.count + ' · ' + new Intl.NumberFormat(language).format(data.attachmentCount),
+  ];
+  if (data.subject) fields.push(copy.subject + ' · ' + data.subject);
+  if (data.from?.length) fields.push(copy.from + ' · ' + data.from.join(', '));
+  if (data.replyTo?.length) fields.push(copy.replyTo + ' · ' + data.replyTo.join(', '));
+  const panel = section(copy.title, list(fields), element('p', copy.limit, 'muted'));
+  if (data.attachments?.length) {
+    panel.append(list(data.attachments.map(({ name, mimeType }) => [name || copy.unnamed, mimeType].filter(Boolean).join(' · '))));
+  }
+  return panel;
+}
+
 function renderPrint() {
   printReport.replaceChildren();
   if (!analysis) return;
   const copy = messages[language];
-  const report = createReport(analysis, input.value, language, includeContent, intelligence);
+  const report = createReport(analysis, input.value, language, includeContent, intelligence, email);
   printReport.append(
     element('h1', `${PRODUCT_NAME[language]} · ${copy.report}`),
     element('p', copy.mode),
@@ -228,6 +246,7 @@ function renderPrint() {
     ].filter(Boolean).join(' · ')))));
   }
   if (report.intelligence) printReport.append(intelligenceSection(report.intelligence));
+  if (report.email) printReport.append(emailSection(report.email));
   printReport.append(
     section(copy.unavailable, list(report.unavailable.map((item) => item.explanation))),
     section(copy.limitations, list(report.limitations)),
@@ -262,6 +281,7 @@ function renderResult() {
   const recovery = element('details', undefined, 'recovery');
   recovery.append(element('summary', copy.recovery), list(guidance.recoverySteps));
   resultBody.append(section(copy.next, list(guidance.nextSteps, true), recovery));
+  if (email) resultBody.append(emailSection({ ...email, attachmentCount: email.attachments.length }));
   const findings = element('ul', undefined, 'findings');
   for (const { signal, contextual, span } of analysis.findings) {
     const item = element('li');
@@ -338,7 +358,7 @@ function downloadReport() {
   byId('report-error').textContent = '';
   notice = undefined;
   try {
-    const report = createReport(analysis, input.value, language, includeContent, intelligence);
+    const report = createReport(analysis, input.value, language, includeContent, intelligence, email);
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
     const anchor = element('a');
     anchor.href = url;
@@ -383,6 +403,7 @@ function resetResult() {
 
 input.addEventListener('input', () => {
   const hadResult = Boolean(analysis);
+  email = undefined;
   resetResult();
   if (hadResult) {
     notice = 'changed';
@@ -441,11 +462,21 @@ file.addEventListener('change', async () => {
   updateEditor();
   renderResult();
   showStatus(messages[language].reading);
-  const result = await readTextFile(selected);
+  let result: { error: InputError } | { value: string; evidence?: EmailEvidence };
+  try {
+    result = /\.eml$/iu.test(selected.name)
+      ? await (await import('./analysis/email.ts')).readEmailFile(selected)
+      : await readTextFile(selected);
+  } catch {
+    result = { error: 'fileRead' as const };
+  }
   if (current !== revision) return;
   busy = undefined;
   if ('error' in result) error = result.error;
-  else input.value = result.value;
+  else {
+    input.value = result.value;
+    email = result.evidence;
+  }
   updateEditor();
   renderResult();
   input.focus();
@@ -453,6 +484,7 @@ file.addEventListener('change', async () => {
 
 byId('clear').addEventListener('click', () => {
   input.value = '';
+  email = undefined;
   file.value = '';
   resetResult();
   notice = 'cleared';
